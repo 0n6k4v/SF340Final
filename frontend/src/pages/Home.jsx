@@ -1,7 +1,7 @@
 import { useState, memo } from "react";
 import { Link } from "react-router-dom";
 import { FaCamera, FaHistory, FaUpload } from "react-icons/fa";
-import { FaFolderOpen, FaChartSimple, FaMapLocationDot  } from "react-icons/fa6";
+import { FaFolderOpen, FaChartSimple, FaMapLocationDot } from "react-icons/fa6";
 import ImagePreview from '../components/Camera/ImagePreview';
 import { useNavigate } from 'react-router-dom';
 
@@ -25,62 +25,19 @@ const MobileFeatureIcon = memo(({ Icon, label, path }) => (
   </Link>
 ));
 
-// Dropdown Component
-const UploadDropdown = memo(({ isOpen, options, onOptionClick }) => {
-  if (!isOpen) return null;
-  
-  return (
-    <div className="absolute left-0 right-0 mt-1 bg-white shadow-lg rounded-md overflow-hidden border border-gray-200 z-50">
-      {options.map((option, index) => (
-        <button 
-          key={index} 
-          className="block w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0"
-          onClick={() => onOptionClick(option)}
-        >
-          {option.label}
-        </button>
-      ))}
-    </div>
-  );
-});
-
 const Home = () => {
   const navigate = useNavigate();
-  const [dropdownOpen, setDropdownOpen] = useState(false);
   const [selectedMode, setSelectedMode] = useState(null);
   const [uploadedImage, setUploadedImage] = useState(null);
-
-  const uploadOptions = [
-    { label: "ปืน", mode: 'อาวุปืน' },
-    { label: "ยาเสพติด", mode: 'ยาเสพติด' }
-  ];
 
   const features = [
     { Icon: FaHistory, label: "ประวัติ", path: "/history" },
     { Icon: FaFolderOpen, label: "บัญชีวัตถุพยาน", path: "/selectCatalogType" },
-    { Icon: FaChartSimple, label: "สถิติ", path: "/statistics" },
+    { Icon: FaChartSimple, label: "แดชบอร์ด", path: "/dashboard" },
     { Icon: FaMapLocationDot, label: "แผนที่", path: "/map" }
   ];
 
-  const handleFileUpload = (file, mode) => {
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        navigate('/imagePreview', { 
-          state: { 
-            imageData: event.target.result, 
-            mode: mode,
-            fromCamera: false,
-            uploadFromCameraPage: false,
-            sourcePath: '/home'
-          } 
-        });
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleOptionClick = (option) => {
+  const handleImageUpload = () => {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
@@ -90,13 +47,13 @@ const Home = () => {
       if (file) {
         const reader = new FileReader();
         reader.onload = (event) => {
-          // Navigate to new ImagePreview route
+          // Navigate to ImagePreview without specifying mode
           navigate('/imagePreview', { 
             state: { 
-              imageData: event.target.result, 
-              mode: option.mode,
-              sourcePath: '/home', // Add this to track the source
-              fromCamera: false
+              imageData: event.target.result,
+              sourcePath: '/home', // Track the source
+              fromCamera: false,
+              uploadFromCameraPage: false
             } 
           });
         };
@@ -147,30 +104,14 @@ const Home = () => {
                 <span>ถ่ายภาพ</span>
               </Link>
 
-              {/* อัพโหลดภาพ + Dropdown */}
-              <div className="relative w-40 min-w-[140px]">
-                <button 
-                  className="w-full border border-red-800 text-red-800 py-3 px-4 rounded-md flex items-center justify-center gap-2 transition-colors hover:bg-red-50"
-                  onClick={() => setDropdownOpen(!dropdownOpen)}
-                >
-                  <FaUpload className="w-5 h-5" />
-                  <span>อัพโหลดภาพ</span>
-                </button>
-
-                {dropdownOpen && (
-                  <div className="absolute left-0 right-0 mt-1 bg-white shadow-lg rounded-md overflow-hidden border border-gray-200 z-50">
-                    {uploadOptions.map((option, index) => (
-                      <button 
-                        key={index} 
-                        className="block w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0"
-                        onClick={() => handleOptionClick(option)}
-                      >
-                        {option.label}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
+              {/* อัพโหลดภาพ - Direct upload without dropdown */}
+              <button 
+                className="w-40 min-w-[140px] border border-red-800 text-red-800 py-3 px-4 rounded-md flex items-center justify-center gap-2 transition-colors hover:bg-red-50"
+                onClick={handleImageUpload}
+              >
+                <FaUpload className="w-5 h-5" />
+                <span>อัพโหลดภาพ</span>
+              </button>
             </div>
           </div>
 
@@ -204,28 +145,13 @@ const Home = () => {
               <FaCamera size={20} /> ถ่ายภาพ
             </Link>
 
-            <div className="relative">
-              <button 
-                className="bg-white border border-red-800 text-red-800 px-6 py-3 rounded-md flex items-center gap-2 justify-center transition-colors hover:bg-red-50" 
-                onClick={() => setDropdownOpen(!dropdownOpen)}
-              >
-                <FaUpload size={20} /> อัปโหลดภาพ
-              </button>
-              
-              {dropdownOpen && (
-                <div className="absolute right-0 mt-2 w-40 bg-white shadow-lg rounded-lg overflow-hidden border border-gray-200">
-                  {uploadOptions.map((option, index) => (
-                    <button 
-                      key={index} 
-                      className="block w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors"
-                      onClick={() => handleOptionClick(option)}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+            {/* Direct upload button without dropdown */}
+            <button 
+              className="bg-white border border-red-800 text-red-800 px-6 py-3 rounded-md flex items-center gap-2 justify-center transition-colors hover:bg-red-50" 
+              onClick={handleImageUpload}
+            >
+              <FaUpload size={20} /> อัปโหลดภาพ
+            </button>
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-3xl mx-auto">

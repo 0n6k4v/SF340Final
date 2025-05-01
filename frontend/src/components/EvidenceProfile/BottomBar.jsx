@@ -1,34 +1,31 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
-const BottomBar = ({ firearmInfo }) => {
+const BottomBar = ({ firearmInfo, evidence, fromCamera, sourcePath }) => {
   const navigate = useNavigate();
   const location = useLocation();
   
-  // Get evidence data and navigation source from location state
-  const evidenceData = location.state?.evidence || 
-    location.state?.result ||
-    JSON.parse(localStorage.getItem('currentEvidenceData')) || 
-    JSON.parse(localStorage.getItem('analysisResult'));
+  // Use directly provided evidence prop first, fall back to location state if needed
+  const evidenceData = evidence || location.state?.evidence || location.state?.result;
   
-  // Extract source information
-  const fromCamera = location.state?.fromCamera || false;
+  // Extract source information with fallbacks
+  const isFromCamera = fromCamera || location.state?.fromCamera || false;
   const uploadFromCameraPage = location.state?.uploadFromCameraPage || false;
-  const sourcePath = location.state?.sourcePath;
+  const sourcePath_ = sourcePath || location.state?.sourcePath;
   
   const handleRetakeOrGoBack = () => {
     // If the image was uploaded from the camera page, go back to camera
-    if (uploadFromCameraPage || fromCamera) {
+    if (uploadFromCameraPage || isFromCamera) {
       navigate('/camera');
     } 
-    // If we have a specific sourcePath saved (could be any page that triggered upload through Navigation)
-    else if (sourcePath) {
-      if (typeof sourcePath === 'number') {
+    // If we have a specific sourcePath saved
+    else if (sourcePath_) {
+      if (typeof sourcePath_ === 'number') {
         // If sourcePath is a number (-1), use navigate(-1) to go back in history
-        navigate(sourcePath);
+        navigate(sourcePath_);
       } else {
-        // Otherwise navigate to the specific path from Navigation
-        navigate(sourcePath);
+        // Otherwise navigate to the specific path
+        navigate(sourcePath_);
       }
     } 
     // Fallback to go back in history
@@ -39,27 +36,34 @@ const BottomBar = ({ firearmInfo }) => {
 
   // Button text differs based on source
   const getButtonText = () => {
-    if (fromCamera) return 'ถ่ายใหม่';
+    if (isFromCamera) return 'ถ่ายใหม่';
     if (uploadFromCameraPage) return 'เลือกรูปใหม่';
     return 'เลือกรูปใหม่';
   };
 
   const handleSave = () => {
+    // Pass the full evidence data in navigation state instead of relying on localStorage
     navigate('/evidenceProfile/save-to-record', { 
       state: { 
         evidence: evidenceData,
         firearmInfo: firearmInfo,
         fromEvidence: true,
         // Pass through all source info
-        fromCamera,
+        fromCamera: isFromCamera,
         uploadFromCameraPage,
-        sourcePath
+        sourcePath: sourcePath_
       } 
     });
   };
 
-  // For debugging
-  console.log('BottomBar state:', {fromCamera, uploadFromCameraPage, sourcePath});
+  // For debugging - only log essential info
+  console.log('BottomBar state:', {
+    fromCamera: isFromCamera, 
+    uploadFromCameraPage, 
+    sourcePath: sourcePath_,
+    hasEvidence: !!evidenceData,
+    evidenceType: evidenceData?.type
+  });
 
   return (
     <div className="w-full py-4 px-4 flex justify-between border-t sm:justify-end sm:space-x-4">

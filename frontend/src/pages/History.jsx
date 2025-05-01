@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useCallback } from "react";
-import { useNavigate, useLocation } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
+import apiConfig from '../config/api';
 import { FiFilter, FiPlus, FiEye, FiEdit, FiTrash, FiMapPin, FiCalendar, FiTag, FiArrowLeft, FiChevronLeft, FiChevronRight, FiX, FiChevronDown, FiChevronUp } from "react-icons/fi";
-import axios from 'axios'; // Added axios import
 
 // --- Date Parsing (BE to CE) ---
 const parseDateBE = (dateString) => {
@@ -146,7 +147,7 @@ const FilterPopup = ({ isOpen, onClose, filters, onFilterChange, onClearFilters,
                     {sectionsOpen.date && (
                     <div className="space-y-4">
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 w-full">
-                        {[
+                       ={[
                             { value: 'today', label: 'วันนี้' },
                             { value: 'last7days', label: '7 วันล่าสุด' },
                             { value: 'last1month', label: '1 เดือนล่าสุด' },
@@ -275,7 +276,6 @@ const initialFilters = {
 
 const History = () => {
     const navigate = useNavigate();
-    const location = useLocation();
     const [isFilterOpen, setIsFilterOpen] = useState(false);
     const [filters, setFilters] = useState(initialFilters);
     const [appliedFilters, setAppliedFilters] = useState(initialFilters);
@@ -287,6 +287,7 @@ const History = () => {
     const [error, setError] = useState(null);
     const [popup, setPopup] = useState({ open: false, type: '', message: '' });
     const [popupCountdown, setPopupCountdown] = useState(5);
+    const API_PATH = '/api';
 
     useEffect(() => {
         const fetchHistoryData = async () => {
@@ -294,7 +295,7 @@ const History = () => {
                 setIsLoading(true);
                 setError(null);
                 
-                const response = await axios.get('http://localhost:3001/api/history');
+                const response = await axios.get(`${apiConfig.baseUrl}${API_PATH}/history`);
                 
                 // Format API data to match the structure we're using
                 const formattedData = response.data.map(item => {
@@ -367,11 +368,6 @@ const History = () => {
                             (a.priority || 999) - (b.priority || 999)
                         );
                         imageUrl = sortedImages[0].image_url;
-                    }
-                    
-                    // Fallback to placeholder
-                    if (!imageUrl) {
-                        imageUrl = 'https://via.placeholder.com/150?text=No+Image';
                     }
 
                     return {
@@ -500,7 +496,7 @@ const History = () => {
         if (location.state && location.state.popup) {
             setPopup(location.state.popup);
             setPopupCountdown(5);
-            window.history.replaceState({}, document.title); // clear state
+            window.history.replaceState({}, document.title);
         }
     }, [location.state]);
 
@@ -544,18 +540,18 @@ const History = () => {
         setCurrentPage(1);
     };
 
-    const handleFilterChange = useCallback((newLocalFilters) => {}, []);
+    const handleFilterChange = (newLocalFilters) => {};
 
-    const handleApplyFilters = useCallback((newAppliedFilters) => {
+    const handleApplyFilters = (newAppliedFilters) => {
         setAppliedFilters(newAppliedFilters);
         setFilters(newAppliedFilters);
-    }, []);
+    };
 
-    const handleClearFilters = useCallback(() => {
+    const handleClearFilters = () => {
         setAppliedFilters(initialFilters);
         setFilters(initialFilters);
         setIsFilterOpen(false);
-    }, []);
+    };
 
     const FilterTags = ({ labels, onRemove }) => {
         if (labels.length === 0) return null;
@@ -578,7 +574,7 @@ const History = () => {
     const handleDeleteHistory = async (id) => {
         if (window.confirm('คุณแน่ใจหรือไม่ว่าต้องการลบประวัตินี้?')) {
             try {
-                await axios.delete(`http://localhost:3001/api/history/${id}`);
+                await axios.delete(apiConfig.getUrl(`/api/history/${id}`));
                 
                 const updatedData = data.filter(item => item.id !== id);
                 setData(updatedData);
@@ -626,11 +622,11 @@ const History = () => {
                 />
                 <FilterTags labels={getFilterLabels()} onRemove={removeFilter} />
                 {isLoading ? (
-                    <div className="flex justify-center items-center py-16">
-                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#b30000]"></div>
+                    <div className="flex justify-center items-center min-h-[65vh]">
+                        <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-[#b30000]"></div>
                     </div>
                 ) : error ? (
-                    <div className="text-center text-red-500 py-10 px-4">
+                    <div className="flex flex-col justify-center items-center min-h-[65vh] text-center text-red-500">
                         <p>{error}</p>
                         <button 
                             onClick={() => window.location.reload()} 

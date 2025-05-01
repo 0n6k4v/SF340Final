@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import RecordTabBar from '../components/Record/RecordTabBar';
 import RecordBottomBar from '../components/Record/RecordBottomBar';
@@ -6,6 +6,7 @@ import SearchableDropdown from '../components/Record/SearchableDropdown';
 import RecordMap from '../components/Record/RecordMap';
 import axios from 'axios';
 import { IoMapOutline } from "react-icons/io5";
+import apiConfig from '../config/api';
 
 const DesktopLayout = (props) => {
   const {
@@ -399,7 +400,7 @@ const MobileLayout = (props) => {
                 <>
                   {placeName ? `${placeName}, ` : ''}
                   {road ? `${road}, ` : ''}
-                  {selectedSubdistrict ? `ต.${selectedSubdistrict}, ` : ''}
+                  {selectedSubdistrict ? `ต.${selectedSubdistrict}, ` : ''} 
                   {selectedDistrict ? `อ.${selectedDistrict}, ` : ''} 
                   {selectedProvince ? `จ.${selectedProvince}` : 'กรุณาเลือกตำแหน่ง'}
                 </>
@@ -457,6 +458,8 @@ const SaveToHistory = () => {
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
 
+  const API_PATH = '/api';
+
   useEffect(() => {
     const now = new Date();
     const today = now.toISOString().slice(0, 10);
@@ -469,13 +472,47 @@ const SaveToHistory = () => {
   useEffect(() => {
     if (location.state?.evidence) {
       setEvidenceData(location.state.evidence);
-      // Save to localStorage as backup
-      localStorage.setItem('currentEvidenceData', JSON.stringify(location.state.evidence));
+      try {
+        // เก็บข้อมูลวัตถุพยานแบบย่อในกรณีที่มีพื้นที่ localStorage จำกัด
+        const minimalEvidenceData = {
+          type: location.state.evidence.type,
+          id: location.state.evidence.id || null,
+          exhibit_id: location.state.evidence.exhibit_id || null,
+          result: location.state.evidence.result ? {
+            brandName: location.state.evidence.result.brandName,
+            modelName: location.state.evidence.result.modelName,
+            confidence: location.state.evidence.result.confidence,
+            confidence_score: location.state.evidence.result.confidence_score,
+            brandConfidence: location.state.evidence.result.brandConfidence,
+            prediction: location.state.evidence.result.prediction
+          } : null,
+        };
+        localStorage.setItem('currentEvidenceData', JSON.stringify(minimalEvidenceData));
+        
+        // แยกเก็บรูปภาพลงใน localStorage
+        if (location.state.evidence.imageUrl || location.state.evidence.image_url) {
+          localStorage.setItem('analysisImage', location.state.evidence.imageUrl || location.state.evidence.image_url);
+        } else if (location.state.image) {
+          localStorage.setItem('analysisImage', location.state.image);
+        }
+      } catch (storageError) {
+        console.warn("Failed to store evidence data in localStorage:", storageError);
+      }
     } else {
-      // Try to get from localStorage if not in state
-      const savedData = localStorage.getItem('currentEvidenceData');
-      if (savedData) {
-        setEvidenceData(JSON.parse(savedData));
+      try {
+        const savedData = localStorage.getItem('currentEvidenceData');
+        if (savedData) {
+          const parsedData = JSON.parse(savedData);
+          // ดึงรูปภาพจาก localStorage แยกต่างหาก
+          const analysisImage = localStorage.getItem('analysisImage');
+          if (analysisImage) {
+            parsedData.imageUrl = analysisImage;
+            parsedData.image_url = analysisImage;
+          }
+          setEvidenceData(parsedData);
+        }
+      } catch (error) {
+        console.error("Error reading from localStorage:", error);
       }
     }
   }, [location.state]);
@@ -484,12 +521,30 @@ const SaveToHistory = () => {
   useEffect(() => {
     if (location.state?.firearmInfo) {
       setFirearmInfo(location.state.firearmInfo);
-      localStorage.setItem('firearmInfo', JSON.stringify(location.state.firearmInfo));
+      try {
+        // Store only essential firearm info to prevent quota issues
+        const minimalFirearmInfo = {
+          id: location.state.firearmInfo.id,
+          brand: location.state.firearmInfo.brand,
+          model: location.state.firearmInfo.model,
+          series: location.state.firearmInfo.series,
+          mechanism: location.state.firearmInfo.mechanism,
+          exhibit_id: location.state.firearmInfo.exhibit_id
+        };
+        localStorage.setItem('firearmInfo', JSON.stringify(minimalFirearmInfo));
+      } catch (storageError) {
+        console.warn("Failed to store firearm info in localStorage:", storageError);
+        // Continue without saving to localStorage
+      }
     } else {
       // Try to get from localStorage if not in state
-      const savedFirearmInfo = localStorage.getItem('firearmInfo');
-      if (savedFirearmInfo) {
-        setFirearmInfo(JSON.parse(savedFirearmInfo));
+      try {
+        const savedFirearmInfo = localStorage.getItem('firearmInfo');
+        if (savedFirearmInfo) {
+          setFirearmInfo(JSON.parse(savedFirearmInfo));
+        }
+      } catch (error) {
+        console.error("Error reading firearm info from localStorage:", error);
       }
     }
   }, [location.state]);
@@ -498,9 +553,9 @@ const SaveToHistory = () => {
   useEffect(() => {
     setLoading(true);
     Promise.all([
-      axios.get('http://localhost:3001/api/provinces'),
-      axios.get('http://localhost:3001/api/districts'),
-      axios.get('http://localhost:3001/api/subdistricts')
+      axios.get(`${apiConfig.baseUrl}${API_PATH}/provinces`),
+      axios.get(`${apiConfig.baseUrl}${API_PATH}/districts`),
+      axios.get(`${apiConfig.baseUrl}${API_PATH}/subdistricts`)
     ]).then(([provincesRes, districtsRes, subdistrictsRes]) => {
       setProvinceList(provincesRes.data);
       setProvinces(provincesRes.data.map(p => ({

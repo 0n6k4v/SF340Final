@@ -2,6 +2,9 @@ import { useState, useEffect } from "react";
 import { Bar, Line, Doughnut } from "react-chartjs-2";
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, PointElement, LineElement, ArcElement, Tooltip, Legend } from "chart.js";
 import axios from 'axios';
+import apiConfig from '../config/api';
+
+const API_PATH = '/api';
 
 ChartJS.register(
   CategoryScale,
@@ -35,7 +38,7 @@ const Statistics = () => {
     const fetchHistoryData = async () => {
       try {
         setLoading(true);
-        const response = await axios.get('http://localhost:3001/api/history');
+        const response = await axios.get(`${apiConfig.baseUrl}${API_PATH}/history`);
         setHistoryData(response.data);
         processHistoryData(response.data);
         setLoading(false);

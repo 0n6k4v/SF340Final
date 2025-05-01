@@ -4,6 +4,9 @@ import { PiImageBroken } from "react-icons/pi";
 import axios from 'axios';
 import SearchableDropdown from '../Record/SearchableDropdown';
 import { useNavigate } from 'react-router-dom';
+import apiConfig from '../../config/api';
+
+const API_PATH = '/api';
 
 // --- Date Parsing (BE to CE) ---
 const parseDateBE = (dateString) => {
@@ -81,9 +84,9 @@ const FilterPopup = ({
     if (isOpen && !preloadedData && provinces.length === 0) {
       setLoading(true);
       Promise.all([
-        axios.get('http://localhost:3001/api/provinces'),
-        axios.get('http://localhost:3001/api/districts'),
-        axios.get('http://localhost:3001/api/subdistricts')
+        axios.get(`${apiConfig.baseUrl}${API_PATH}/provinces`),
+        axios.get(`${apiConfig.baseUrl}${API_PATH}/districts`),
+        axios.get(`${apiConfig.baseUrl}${API_PATH}/subdistricts`)
       ]).then(([provincesRes, districtsRes, subdistrictsRes]) => {
         setProvinceList(provincesRes.data);
         setProvinces(provincesRes.data.map(p => ({
@@ -490,9 +493,9 @@ const History = ({ firearmInfo }) => {
             try {
                 setLocationLoading(true);
                 const [provincesRes, districtsRes, subdistrictsRes] = await Promise.all([
-                    axios.get('http://localhost:3001/api/provinces'),
-                    axios.get('http://localhost:3001/api/districts'),
-                    axios.get('http://localhost:3001/api/subdistricts')
+                    axios.get(`${apiConfig.baseUrl}${API_PATH}/provinces`),
+                    axios.get(`${apiConfig.baseUrl}${API_PATH}/districts`),
+                    axios.get(`${apiConfig.baseUrl}${API_PATH}/subdistricts`)
                 ]);
 
                 setProvinceList(provincesRes.data);
@@ -530,7 +533,7 @@ const History = ({ firearmInfo }) => {
                 const exhibitId = firearmInfo.exhibit_id;
                 
                 // ปรับ URL API ให้ถูกต้อง - ต้องเปลี่ยนเป็น URL ที่ถูกต้องของระบบคุณ
-                const response = await axios.get(`http://localhost:3001/api/history/exhibit/${exhibitId}`);
+                const response = await axios.get(`${apiConfig.baseUrl}${API_PATH}/history/exhibit/${exhibitId}`);
                 
                 // ตรวจสอบว่ามีข้อมูลหรือไม่
                 if (!response.data) {
@@ -877,7 +880,7 @@ const History = ({ firearmInfo }) => {
                                         // ใช้ ID จาก firearmInfo เพื่อดึงข้อมูลประวัติ
                                         const exhibitId = firearmInfo.exhibit_id;
                                         
-                                        const response = await axios.get(`http://localhost:3001/api/history/exhibit/${exhibitId}`);
+                                        const response = await axios.get(`${apiConfig.baseUrl}${API_PATH}/history/exhibit/${exhibitId}`);
                                         
                                         // ตรวจสอบว่ามีข้อมูลหรือไม่
                                         if (!response.data) {
@@ -934,9 +937,9 @@ const History = ({ firearmInfo }) => {
                                     try {
                                         setLocationLoading(true);
                                         const [provincesRes, districtsRes, subdistrictsRes] = await Promise.all([
-                                            axios.get('http://localhost:3001/api/provinces'),
-                                            axios.get('http://localhost:3001/api/districts'),
-                                            axios.get('http://localhost:3001/api/subdistricts')
+                                            axios.get(`${apiConfig.baseUrl}${API_PATH}/provinces`),
+                                            axios.get(`${apiConfig.baseUrl}${API_PATH}/districts`),
+                                            axios.get(`${apiConfig.baseUrl}${API_PATH}/subdistricts`)
                                         ]);
 
                                         setProvinceList(provincesRes.data);

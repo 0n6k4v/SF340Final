@@ -19,6 +19,7 @@ const RecordMap = ({ setCoordinates }) => {
   const autoScrollRef = useRef(null);
   const edgeThreshold = 50;
   const longdo_api_key = import.meta.env.VITE_LONGDO_MAP_API_KEY;
+  const [isMapMounted, setIsMapMounted] = useState(false);
 
   // Function to handle auto-scrolling during drag
   const setupMarkerDragBehavior = (marker) => {
@@ -86,7 +87,9 @@ const RecordMap = ({ setCoordinates }) => {
       // ลบส่วนที่เกี่ยวกับ popup ทั้งหมด
       
       // Center the map on the final marker position
-      mapInstance.current.panTo(newPosition);
+      if (mapInstance.current) {
+        mapInstance.current.panTo(newPosition);
+      }
     });
   };
   
@@ -107,78 +110,96 @@ const RecordMap = ({ setCoordinates }) => {
     }
   };
 
+  // Check if the DOM element is actually ready
   useEffect(() => {
-    // Initialize map if mapRef is available and map isn't already initialized
-    if (mapRef.current && !mapInstance.current) {
-      // Default view centered on Thailand
-      const defaultView = [13.7563, 100.5018]; // Bangkok coordinates
-      const initialZoom = 5;
-      
-      // Create map instance
-      mapInstance.current = L.map(mapRef.current).setView(defaultView, initialZoom);
+    if (mapRef.current && !isMapMounted) {
+      setIsMapMounted(true);
+    }
+  }, [isMapMounted]);
 
-      // Add OpenStreetMap tile layer
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-      }).addTo(mapInstance.current);
+  useEffect(() => {
+    // Initialize map only if mapRef is available, map isn't already initialized, and the element is actually mounted
+    if (mapRef.current && !mapInstance.current && isMapMounted) {
+      try {
+        // Default view centered on Thailand
+        const defaultView = [13.7563, 100.5018]; // Bangkok coordinates
+        const initialZoom = 5;
+        
+        // Create map instance safely
+        mapInstance.current = L.map(mapRef.current).setView(defaultView, initialZoom);
 
-      // Try to get user's current location
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const { latitude, longitude } = position.coords;
-          setUserLocation([latitude, longitude]);
+        // Add OpenStreetMap tile layer
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(mapInstance.current);
+
+        // Try to get user's current location
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const { latitude, longitude } = position.coords;
+            setUserLocation([latitude, longitude]);
+            
+            // Safety check before using mapInstance
+            if (!mapInstance.current) {
+              console.warn("Map instance was destroyed before location was retrieved");
+              return;
+            }
+            
+            // Center map on user location and zoom in
+            mapInstance.current.setView([latitude, longitude], 15);
+            
+            // Add marker at user's location without popup
+            markerRef.current = L.marker([latitude, longitude], { draggable: true })
+              .addTo(mapInstance.current);
+
+            // Setup the drag behavior
+            setupMarkerDragBehavior(markerRef.current);
+            
+            // Trigger reverse geocoding for the initial location
+            if (setCoordinates) {
+              setCoordinates({
+                lat: latitude,
+                lng: longitude
+              });
+            }
+            
+            setIsLoading(false);
+          },
+          (error) => {
+            console.error('Error getting location:', error);
+            setIsLoading(false);
+          },
+          { enableHighAccuracy: true }
+        );
+        
+        // Allow clicking on map to add or change marker
+        mapInstance.current.on('click', async (e) => {
+          if (markerRef.current) {
+            mapInstance.current.removeLayer(markerRef.current);
+          }
           
-          // Center map on user location and zoom in
-          mapInstance.current.setView([latitude, longitude], 15);
-          
-          // Add marker at user's location without popup
-          markerRef.current = L.marker([latitude, longitude], { draggable: true })
+          // Create a marker without popup
+          markerRef.current = L.marker(e.latlng, { draggable: true })
             .addTo(mapInstance.current);
-
-          // Setup the drag behavior
-          setupMarkerDragBehavior(markerRef.current);
           
-          // Trigger reverse geocoding for the initial location
+          // Send coordinates to parent component to trigger reverse geocoding
           if (setCoordinates) {
             setCoordinates({
-              lat: latitude,
-              lng: longitude
+              lat: e.latlng.lat,
+              lng: e.latlng.lng
             });
           }
           
-          setIsLoading(false);
-        },
-        (error) => {
-          console.error('Error getting location:', error);
-          setIsLoading(false);
-        },
-        { enableHighAccuracy: true }
-      );
-      
-      // Allow clicking on map to add or change marker
-      mapInstance.current.on('click', async (e) => {
-        if (markerRef.current) {
-          mapInstance.current.removeLayer(markerRef.current);
-        }
-        
-        // Create a marker without popup
-        markerRef.current = L.marker(e.latlng, { draggable: true })
-          .addTo(mapInstance.current);
-        
-        // Send coordinates to parent component to trigger reverse geocoding
-        if (setCoordinates) {
-          setCoordinates({
-            lat: e.latlng.lat,
-            lng: e.latlng.lng
-          });
-        }
-        
-        // Center the map on the marker after placing it
-        mapInstance.current.panTo(e.latlng);
-        
-        // Setup the drag behavior
-        setupMarkerDragBehavior(markerRef.current);
-      });
+          // Center the map on the marker after placing it
+          mapInstance.current.panTo(e.latlng);
+          
+          // Setup the drag behavior
+          setupMarkerDragBehavior(markerRef.current);
+        });
+      } catch (error) {
+        console.error("Error initializing map:", error);
+        setIsLoading(false);
+      }
     }
 
     // Cleanup function to remove map when component unmounts
@@ -193,7 +214,19 @@ const RecordMap = ({ setCoordinates }) => {
         mapInstance.current = null;
       }
     };
-  }, [setCoordinates]);
+  }, [setCoordinates, isMapMounted]);
+
+  // Update leaflet container size when the map is shown in modal
+  useEffect(() => {
+    if (mapInstance.current) {
+      // Small timeout to ensure the DOM has updated
+      const resizeTimer = setTimeout(() => {
+        mapInstance.current.invalidateSize();
+      }, 100);
+
+      return () => clearTimeout(resizeTimer);
+    }
+  }, [isMapMounted]);
 
   return (
     <div className="w-full h-full flex flex-col">

@@ -1,5 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
+import apiConfig from '../../config/api';
+
+const API_PATH = '/api';
 
 const SvgMap = ({ 
   // รับ props จาก parent component
@@ -37,7 +40,7 @@ const SvgMap = ({
     const fetchProvinces = async () => {
       setLoadingProvinces(true);
       try {
-        const provincesResponse = await axios.get('http://localhost:3001/api/provinces');
+        const provincesResponse = await axios.get(`${apiConfig.baseUrl}${API_PATH}/provinces`);
         setProvinces(provincesResponse.data);
       } catch (error) {
         console.error('Error fetching provinces:', error);
@@ -52,7 +55,7 @@ const SvgMap = ({
     const fetchAllDistricts = async () => {
       setLoadingDistricts(true);
       try {
-        const districtsResponse = await axios.get('http://localhost:3001/api/districts');
+        const districtsResponse = await axios.get(`${apiConfig.baseUrl}${API_PATH}/districts`);
         setDistricts(districtsResponse.data.map(d => ({
           ...d,
           province_id: d.province_id || d.prov_id || null
@@ -70,7 +73,7 @@ const SvgMap = ({
     const fetchAllSubDistricts = async () => {
       setLoadingSubdistricts(true);
       try {
-        const subdistrictsResponse = await axios.get('http://localhost:3001/api/subdistricts');
+        const subdistrictsResponse = await axios.get(`${apiConfig.baseUrl}${API_PATH}/subdistricts`);
         setSubdistricts(subdistrictsResponse.data.map(sd => ({
           ...sd,
           district_id: sd.district_id || null

@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import apiConfig from '../../config/api';
+
+const API_PATH = '/api';
 
 const RecordBottomBar = ({
   evidenceData,
@@ -45,23 +48,32 @@ const RecordBottomBar = ({
   };
 
   const dataURLtoFile = (dataUrl, filename) => {
-    const arr = dataUrl.split(',');
-    const mime = arr[0].match(/:(.*?);/)[1];
-    const bstr = atob(arr[1]);
-    let n = bstr.length;
-    const u8arr = new Uint8Array(n);
-    
-    while (n--) {
-      u8arr[n] = bstr.charCodeAt(n);
+    try {
+      const arr = dataUrl.split(',');
+      const mime = arr[0].match(/:(.*?);/)[1];
+      const bstr = atob(arr[1]);
+      let n = bstr.length;
+      const u8arr = new Uint8Array(n);
+      
+      while (n--) {
+        u8arr[n] = bstr.charCodeAt(n);
+      }
+      
+      return new File([u8arr], filename, { type: mime });
+    } catch (error) {
+      console.error('Error converting dataURL to File:', error);
+      return null;
     }
-    
-    return new File([u8arr], filename, { type: mime });
   };
 
   const handleSave = async () => {
     // ตั้งค่าสถานะให้กำลังบันทึก
     setIsSaving(true);
     setSaveError(null);
+    
+    console.log("กำลังเตรียมข้อมูลสำหรับบันทึกประวัติ...");
+    console.log("Evidence Data:", evidenceData);
+    console.log("Firearm Info:", firearmInfo);
     
     // คำนวณ confidence percentage ตาม evidence type
     let confidencePercentage = 0;
@@ -93,32 +105,53 @@ const RecordBottomBar = ({
       // เตรียมข้อมูล form สำหรับอัปโหลดรูปภาพ
       let formData = new FormData();
       
+      // หา exhibit_id จาก evidenceData หรือ firearmInfo
+      let exhibit_id = null;
+      if (firearmInfo && firearmInfo.exhibit_id) {
+        exhibit_id = firearmInfo.exhibit_id;
+      } else if (evidenceData) {
+        exhibit_id = evidenceData.id || evidenceData.exhibit_id || null;
+      }
+      
+      console.log("Exhibit ID to be used:", exhibit_id);
+      
       // ถ้ามีรูปภาพ ให้แปลง dataURL เป็น File และเพิ่มเข้า formData
       if (imageData && imageData.startsWith('data:')) {
-        const imageFile = dataURLtoFile(imageData, 'evidence.jpg');
-        formData.append('image', imageFile);
+        try {
+          const imageFile = dataURLtoFile(imageData, 'evidence.jpg');
+          if (imageFile) {
+            formData.append('image', imageFile);
+            console.log("รูปภาพถูกเพิ่มใน FormData");
+          }
+        } catch (imgError) {
+          console.error("Error processing image:", imgError);
+        }
       }
       
       // เพิ่มข้อมูลอื่นๆ เข้า formData
-      formData.append('exhibit_id', firearmInfo?.exhibit_id || evidenceData?.id || evidenceData?.exhibit_id || null);
-      formData.append('province_id', province?.id || null);
-      formData.append('district_id', district?.id || null);
-      formData.append('subdistrict_id', subdistrict?.id || null);
-      formData.append('house_no', houseNumber || '');
-      formData.append('village_no', village || '');
-      formData.append('alley', soi || '');
-      formData.append('road', road || '');
-      formData.append('place_name', placeName || '');
-      formData.append('date', date || new Date().toISOString().split('T')[0]);
-      formData.append('time', time || new Date().toTimeString().substring(0, 5));
-      formData.append('latitude', coordinates?.lat || null);
-      formData.append('longitude', coordinates?.lng || null);
-      formData.append('confidence_percentage', confidencePercentage);
+      if (exhibit_id) formData.append('exhibit_id', exhibit_id);
+      if (province?.id) formData.append('province_id', province.id);
+      if (district?.id) formData.append('district_id', district.id);
+      if (subdistrict?.id) formData.append('subdistrict_id', subdistrict.id);
+      if (houseNumber) formData.append('house_no', houseNumber);
+      if (village) formData.append('village_no', village);
+      if (soi) formData.append('alley', soi);
+      if (road) formData.append('road', road);
+      if (placeName) formData.append('place_name', placeName);
+      if (date) formData.append('date', date);
+      if (time) formData.append('time', time);
+      if (coordinates?.lat) formData.append('latitude', coordinates.lat);
+      if (coordinates?.lng) formData.append('longitude', coordinates.lng);
+      if (confidencePercentage) formData.append('confidence_percentage', confidencePercentage);
 
-      console.log('กำลังบันทึกประวัติ:', Object.fromEntries(formData));
+      // แสดง console log สำหรับตรวจสอบข้อมูล
+      console.log('กำลังบันทึกประวัติ:');
+      formData.forEach((value, key) => {
+        console.log(`${key}: ${value}`);
+      });
       
-      // ส่ง API request ไปยัง Backend เพื่อบันทึกข้อมูล
-      const response = await axios.post('http://localhost:3001/api/history', formData, {
+      // เปลี่ยน URL จาก Node.js เป็น FastAPI
+      const response = await axios.post(`${apiConfig.baseUrl}${API_PATH}/history`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data'
         }
@@ -138,13 +171,14 @@ const RecordBottomBar = ({
       
     } catch (error) {
       console.error('เกิดข้อผิดพลาดในการบันทึกประวัติ:', error);
-      setSaveError(error.response?.data?.error || 'ไม่สามารถบันทึกประวัติได้ โปรดลองอีกครั้ง');
+      console.error('รายละเอียดข้อผิดพลาด:', error.response?.data || error.message);
+      setSaveError(error.response?.data?.detail || error.response?.data?.error || 'ไม่สามารถบันทึกประวัติได้ โปรดลองอีกครั้ง');
       navigate('/history', {
         state: {
           popup: {
             open: true,
             type: 'fail',
-            message: error.response?.data?.error || 'ไม่สามารถบันทึกประวัติได้ โปรดลองอีกครั้ง'
+            message: error.response?.data?.detail || error.response?.data?.error || 'ไม่สามารถบันทึกประวัติได้ โปรดลองอีกครั้ง'
           }
         }
       });

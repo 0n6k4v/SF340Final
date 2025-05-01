@@ -1,15 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { FiMenu, FiChevronDown, FiChevronUp, FiX } from 'react-icons/fi';
+import { FiMenu, FiX } from 'react-icons/fi';
 import { FaHome, FaCamera, FaUpload, FaPills, FaHistory } from "react-icons/fa";
 import { FaMapLocationDot, FaFolderOpen, FaChartSimple } from "react-icons/fa6";
-import { GiPistolGun } from "react-icons/gi";
 import { useNavigate, useLocation } from 'react-router-dom';
 
 const Navigation = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [isMobile, setIsMobile] = useState(false);
-  // Initialize sidebar state from localStorage or default to false (hidden)
   const [isSidebarOpen, setSidebarOpen] = useState(() => {
     const savedState = localStorage.getItem('sidebarState');
     return savedState ? JSON.parse(savedState) : false;
@@ -31,17 +29,61 @@ const Navigation = () => {
     const path = location.pathname.slice(1) || 'home';
     return path;
   });
+  
+  // Define handleUploadOptionClick first (since it's used by handleUploadClick)
+  const handleUploadOptionClick = (e) => {
+    e.stopPropagation();
+    
+    // Create file input element
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    
+    input.onchange = (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          // Navigate to ImagePreview route without specifying a mode
+          navigate('/imagePreview', { 
+            state: { 
+              imageData: event.target.result,
+              // Add these important source tracking properties
+              fromCamera: false,
+              uploadFromCameraPage: false,
+              // Use the current path as sourcePath
+              sourcePath: location.pathname
+            } 
+          });
+        };
+        reader.readAsDataURL(file);
+      }
+    };
+    
+    input.click();
+    
+    // ปิด dropdown เฉพาะตอน sidebar ย่อ
+    if (!isSidebarOpen) {
+      setUploadDropdownOpen(false);
+    }
+    
+    closeBottomSheet();
+  };
+  
+  // Define handleUploadClick to fix the error
+  const handleUploadClick = (e) => {
+    e.stopPropagation();
+    handleUploadOptionClick(e);
+  };
 
   // Check screen size and set mobile state
   useEffect(() => {
     const checkScreenSize = () => {
       const mobile = window.innerWidth < 768;
       setIsMobile(mobile);
-      // Only auto-open sidebar on desktop if the saved state is "open"
       if (mobile) {
         setSidebarOpen(false);
       }
-      // Don't force sidebar open on desktop - respect the saved state
     };
     
     checkScreenSize();
@@ -49,15 +91,14 @@ const Navigation = () => {
     return () => window.removeEventListener('resize', checkScreenSize);
   }, []);
 
-  // Save sidebar state to localStorage whenever it changes
+  // Save sidebar state to localStorage
   useEffect(() => {
     localStorage.setItem('sidebarState', JSON.stringify(isSidebarOpen));
   }, [isSidebarOpen]);
 
-  // Close dropdown when clicking outside or when sidebar collapses
+  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
-      // For collapsed sidebar dropdown
       if (!isSidebarOpen && dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setUploadDropdownOpen(false);
       }
@@ -74,7 +115,7 @@ const Navigation = () => {
     }
   }, [isSidebarOpen]);
 
-  // Effect to handle Bottom Sheet open/close animation
+  // Handle Bottom Sheet animation
   useEffect(() => {
     if (isBottomSheetOpen) {
       requestAnimationFrame(() => {
@@ -82,7 +123,7 @@ const Navigation = () => {
           if (sheetHeight.current === 0) {
             sheetHeight.current = bottomSheetRef.current.offsetHeight;
           }
-          setSheetTranslateY('0%'); // Animate open
+          setSheetTranslateY('0%'); 
           setSheetTransition('transform 0.3s ease-out');
         }
       });
@@ -111,21 +152,16 @@ const Navigation = () => {
   const menuItems = [
     { id: 'home', icon: <FaHome size={24} />, text: "หน้าหลัก", path: "/home", showInBottom: true },
     { id: 'camera', icon: <FaCamera size={24} />, text: "ถ่ายภาพ", path: "/camera", showInBottom: true, isSpecial: true },
-    { id: 'upload', icon: <FaUpload size={24} />, text: "อัพโหลดภาพ", path: "/upload", showInBottom: true, hasDropdown: true },
+    { id: 'upload', icon: <FaUpload size={24} />, text: "อัพโหลดภาพ", action: handleUploadClick, showInBottom: true },
     { id: 'history', icon: <FaHistory size={24} />, text: "ประวัติ", path: "/history", showInBottom: true },
     { id: 'selectCatalogType', icon: <FaFolderOpen size={24} />, text: "บัญชีวัตถุพยาน", path: "/selectCatalogType", showInBottom: false },
-    { id: 'dashboard', icon: <FaChartSimple size={24} />, text: "สถิติ", path: "/dashboard", showInBottom: false },
+    { id: 'dashboard', icon: <FaChartSimple size={24} />, text: "แดชบอร์ด", path: "/dashboard", showInBottom: false },
     { id: 'map', icon: <FaMapLocationDot size={24} />, text: "แผนที่", path: "/map", showInBottom: true },
   ];
 
-  const uploadDropdownItems = [
-    { id: 'upload-gun', icon: <GiPistolGun size={24} />, text: "อาวุธปืน", path: "/upload/photo", mode: "อาวุปืน" },
-    { id: 'upload-drug', icon: <FaPills size={24} />, text: "ยาเสพติด", path: "/upload/album", mode: "ยาเสพติด" },
-  ];
-
+  // Update bottom sheet items - remove upload options since we're doing direct upload now
   const bottomSheetItems = [
-    { id: 'upload-gun', icon: <GiPistolGun size={24} />, text: "อาวุธปืน", path: "/upload/photo", mode: "อาวุปืน", action: "uploadOption" },
-    { id: 'upload-drug', icon: <FaPills size={24} />, text: "ยาเสพติด", path: "/upload/album", mode: "ยาเสพติด", action: "uploadOption" },
+    { id: 'upload', icon: <FaUpload size={24} />, text: "อัพโหลดภาพ", action: "uploadOption" },
     ...menuItems.filter(item => !item.showInBottom),
   ];
 
@@ -136,49 +172,7 @@ const Navigation = () => {
     setActiveTab(id);
     navigate(path);
     
-    // ถ้าเป็น sidebar ที่ย่อแล้ว (collapsed) ให้ปิด dropdown เมื่อเลือกเมนูอื่น
     if (!isSidebarOpen && id !== 'upload') {
-      setUploadDropdownOpen(false);
-    }
-    
-    closeBottomSheet();
-  };
-
-  const handleUploadOptionClick = (e, item) => {
-    e.stopPropagation();
-    
-    // Create file input element
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-    
-    input.onchange = (e) => {
-      const file = e.target.files[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          // Navigate to ImagePreview route with image data and mode
-          // Include the current path as sourcePath
-          navigate('/imagePreview', { 
-            state: { 
-              imageData: event.target.result, 
-              mode: item.mode,
-              // Add these important source tracking properties
-              fromCamera: false,
-              uploadFromCameraPage: false,
-              // Use the current path as sourcePath
-              sourcePath: location.pathname
-            } 
-          });
-        };
-        reader.readAsDataURL(file);
-      }
-    };
-    
-    input.click();
-    
-    // ปิด dropdown เฉพาะตอน sidebar ย่อ
-    if (!isSidebarOpen) {
       setUploadDropdownOpen(false);
     }
     
@@ -188,36 +182,31 @@ const Navigation = () => {
   const toggleUploadDropdown = (e) => {
     e.stopPropagation();
     
-    // If sidebar is collapsed and user clicks on upload button, expand the sidebar first
     if (!isSidebarOpen && !isMobile) {
       setSidebarOpen(true);
-      // Open the dropdown after sidebar is expanded
       setTimeout(() => {
         setUploadDropdownOpen(true);
-      }, 300); // Match transition duration
+      }, 300);
     } else {
-      // Normal toggle behavior
       setUploadDropdownOpen(!isUploadDropdownOpen);
     }
   };
 
   const handleBottomSheetItemClick = (e, item) => {
     if (item.action === 'uploadOption') {
-      handleUploadOptionClick(e, item);
+      handleUploadOptionClick(e);
     } else {
       handleNavClick(e, item.path, item.id);
     }
   };
 
   const closeBottomSheet = () => {
-    // ตั้งค่า transition ให้ animate ก่อนที่จะปิด bottom sheet
     setSheetTransition('transform 0.3s ease-out');
     setSheetTranslateY('100%');
     
-    // หลังจากที่ animation เสร็จสิ้นแล้วจึงค่อยปิด bottom sheet
     setTimeout(() => {
       setBottomSheetOpen(false);
-    }, 300); // ต้องตรงกับเวลา transition
+    }, 300);
   };
 
   // Touch Handlers for Draggable Bottom Sheet
@@ -320,60 +309,9 @@ const Navigation = () => {
               {activeTab === item.id && (
                 <div className="absolute left-0 top-0 w-2 h-full bg-[#990000]" />
               )}
-              {item.hasDropdown ? (
-                <div>
-                  <button
-                    onClick={toggleUploadDropdown}
-                    className={`
-                      flex items-center justify-between px-4 py-4 w-full text-left
-                      hover:bg-[#444444] transition-all
-                      ${activeTab === item.id || isUploadDropdownOpen ? 'bg-[#444444]' : ''}
-                    `}
-                  >
-                    <div className="flex items-center space-x-6">
-                      <div className="min-w-[24px]">
-                        {item.icon}
-                      </div>
-                      <span className={`text-base whitespace-nowrap transition-opacity ${isSidebarOpen ? 'opacity-100' : 'opacity-0'}`}>
-                        {item.text}
-                      </span>
-                    </div>
-                    {isSidebarOpen && (
-                      <div className="text-gray-400">
-                        {isUploadDropdownOpen ? <FiChevronUp size={20} /> : <FiChevronDown size={20} />}
-                      </div>
-                    )}
-                  </button>
-                  
-                  {/* Dropdown Menu - Only show when sidebar is expanded */}
-                  {isUploadDropdownOpen && isSidebarOpen && (
-                    <div className="bg-[#222222]">
-                      {uploadDropdownItems.map((subItem) => (
-                        <button
-                          key={subItem.id}
-                          onClick={(e) => handleUploadOptionClick(e, subItem)}
-                          className={`
-                            flex items-center space-x-6 
-                            px-16
-                            py-3 w-full text-left
-                            hover:bg-[#333333] transition-all
-                            ${activeTab === subItem.id ? 'bg-[#333333] text-white' : 'text-gray-300'}
-                          `}
-                        >
-                          <div className="min-w-[24px]">
-                            {subItem.icon}
-                          </div>
-                          <span className="text-base whitespace-nowrap">
-                            {subItem.text}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ) : (
+              {!item.hasDropdown ? (
                 <button
-                  onClick={(e) => handleNavClick(e, item.path, item.id)}
+                  onClick={(e) => item.action ? item.action(e) : handleNavClick(e, item.path, item.id)}
                   className={`
                     flex items-center space-x-6 px-4 py-4 w-full text-left
                     hover:bg-[#444444] transition-all
@@ -387,7 +325,7 @@ const Navigation = () => {
                     {item.text}
                   </span>
                 </button>
-              )}
+              ) : null}
             </div>
           ))}
         </nav>

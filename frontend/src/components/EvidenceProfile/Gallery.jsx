@@ -10,10 +10,21 @@ const Gallery = ({ evidence, firearmInfo }) => {
   
   // ทำการแปลงข้อมูลจาก firearmInfo เป็นรูปแบบที่ต้องการในครั้งแรกที่ component โหลด
   useEffect(() => {
-    if (firearmInfo && firearmInfo.exhibit && firearmInfo.exhibit.images && firearmInfo.exhibit.images.length > 0) {
-      // คัดลอกรูปภาพเพื่อไม่ให้มีการเปลี่ยนแปลงข้อมูลต้นฉบับ
-      const images = [...firearmInfo.exhibit.images];
-      
+    console.log("FirearmInfo in Gallery:", firearmInfo);
+    
+    // ตรวจสอบว่า images อาจจะอยู่ที่ firearmInfo.images หรือ firearmInfo.exhibit.images
+    let images = [];
+    
+    // กรณีที่ firearmInfo มี images โดยตรง
+    if (firearmInfo && firearmInfo.images && firearmInfo.images.length > 0) {
+      images = [...firearmInfo.images];
+    } 
+    // กรณีที่ images อยู่ใน firearmInfo.exhibit
+    else if (firearmInfo && firearmInfo.exhibit && firearmInfo.exhibit.images && firearmInfo.exhibit.images.length > 0) {
+      images = [...firearmInfo.exhibit.images];
+    }
+    
+    if (images.length > 0) {
       // เรียงลำดับรูปภาพตาม priority ถ้าไม่มี priority ให้เรียงตาม id
       images.sort((a, b) => {
         if (a.priority && b.priority) {
@@ -35,9 +46,11 @@ const Gallery = ({ evidence, firearmInfo }) => {
         priority: img.priority
       }));
       
+      console.log("Formatted gallery images:", formattedImages);
       setGalleryImages(formattedImages);
     } else {
       // กรณีไม่มีข้อมูลรูปภาพใน firearmInfo ส่ง array ว่างกลับไป
+      console.log("No images found in firearmInfo");
       setGalleryImages([]);
     }
   }, [firearmInfo]);
@@ -126,6 +139,11 @@ const Gallery = ({ evidence, firearmInfo }) => {
             ) : (
               <NoImageDisplay message="ไม่พบภาพเปรียบเทียบ" subMessage="ไม่มีภาพในฐานข้อมูล" />
             )}
+            {selectedGalleryImage && (
+              <div className="hidden flex-col items-center justify-center">
+                <NoImageDisplay message="การแสดงผลภาพผิดพลาด" subMessage="ไม่สามารถโหลดรูปภาพได้" />
+              </div>
+            )}
           </div>
           
           <div className="mt-6">
@@ -164,7 +182,7 @@ const Gallery = ({ evidence, firearmInfo }) => {
         {/* ส่วนซ้าย: รูปที่ผู้ใช้ถ่าย */}
         <div className="w-1/2">
           <div className="p-3">
-            <h3 className="text-base font-medium inline-block pb-2 border-b-2 border-gray-200 w-full">ภาพถ่าย</h3>
+            <h3 className="text-base font-medium inline-block pb-2 border-b-2 border-gray-200 w-full">ภาพถ่ายหลักฐาน</h3>
           </div>
           <div className="flex justify-center items-center p-4">
             {userImage ? (
@@ -202,7 +220,7 @@ const Gallery = ({ evidence, firearmInfo }) => {
         {/* ส่วนขวา: รูปจาก Gallery เพื่อเปรียบเทียบ */}
         <div className="w-1/2">
           <div className="p-3">
-            <h3 className="text-base font-medium inline-block pb-2 border-b-2 border-gray-200 w-full">ภาพจากคลัง</h3>
+            <h3 className="text-base font-medium inline-block pb-2 border-b-2 border-gray-200 w-full">ภาพจากฐานข้อมูล</h3>
           </div>
           <div className="p-4">
             <div className="w-full">

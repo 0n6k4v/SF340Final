@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import apiConfig from '../../config/api';
+
+const API_PATH = '/api';
 
 const GunHistoryProfile = ({ item }) => {
   const [showShareNotification, setShowShareNotification] = useState(false);
@@ -17,7 +20,7 @@ const GunHistoryProfile = ({ item }) => {
 
       try {
         setLoading(true);
-        const response = await axios.get(`http://localhost:3001/api/history/${item.id}`);
+        const response = await axios.get(`${apiConfig.baseUrl}${API_PATH}/history/${item.id}`);
         const data = response.data;
         setDetailedData(data);
         

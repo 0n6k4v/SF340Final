@@ -19,6 +19,7 @@ import GunCatalog from './components/EvidenceCatalog/GunCatalog';
 import GunProfile from './components/EvidenceCatalog/GunProfile';
 import DrugCatalog from './components/EvidenceCatalog/DrugCatalog';
 import DrugProfile from './components/EvidenceCatalog/DrugProfile';
+import CandidateShow from './components/Camera/CandidateShow';
 
 const App = () => {
   return (
@@ -27,6 +28,8 @@ const App = () => {
       <Route path='/login' element={<Login />} />
       <Route path='/camera' element={<CameraPage />} />
       <Route path='/imagePreview' element={<ImagePreview />}/>
+      <Route path="/candidateShow" element={<CandidateShow />} />
+
 
       {/* Layout */}
       <Route element={<Layout />}>

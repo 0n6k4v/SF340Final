@@ -2,6 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { FaShareSquare } from 'react-icons/fa';
 import { IoChevronBack, IoClose } from 'react-icons/io5';
+import apiConfig from '../../config/api';
+
+const API_PATH = '/api';
 
 const GunProfile = () => {
   const { id } = useParams();
@@ -15,25 +18,24 @@ const GunProfile = () => {
     setError(null);
     setSelectedGun(null);
     setSelectedImage(null);
-
-    fetch(`http://localhost:3001/api/firearms/${id}`)
+    fetch(`${apiConfig.baseUrl}${API_PATH}/exhibits/${id}`)
       .then(res => {
         if (!res.ok) throw new Error('ไม่พบข้อมูลปืน');
         return res.json();
       })
       .then(data => {
-        // แปลงข้อมูลให้เหมาะกับโครงสร้างเดิม
+        // แปลงข้อมูลจาก API ใหม่ให้เข้ากับโครงสร้างเดิม
         const gun = {
-          id: data.exhibit?.id ?? data.exhibit_id ?? data.id,
-          image: data.exhibit?.images?.length
-            ? data.exhibit.images.map(img => img.image_url)
+          id: data.id,
+          image: data.images?.length
+            ? data.images.map(img => img.image_url)
             : [],
-          mechanism: data.mechanism,
-          brand: data.brand,
-          series: data.series,
-          model: data.model,
-          subcategories: data.exhibit?.subcategory ?? '',
-          caliber: data.caliber ?? [],
+          mechanism: data.firearm?.mechanism || '',
+          brand: data.firearm?.brand || '',
+          series: data.firearm?.series || '',
+          model: data.firearm?.model || '',
+          subcategories: data.subcategory || '',
+          caliber: data.firearm?.caliber || [],
         };
         setSelectedGun(gun);
         setSelectedImage(gun.image[0] || null);
@@ -132,7 +134,7 @@ const GunProfile = () => {
           </div>
           
           <h1 className="text-2xl uppercase font-bold mt-1">
-            Model {selectedGun.model}
+            {selectedGun.series} {selectedGun.model}
           </h1>
           
           <div className="mt-4 pt-4 border-t border-gray-200">

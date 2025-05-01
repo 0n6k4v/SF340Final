@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { IoClose } from 'react-icons/io5';
 import { PiImageBroken } from "react-icons/pi";
 
-const GunProfile = ({ analysisResult, firearmInfo }) => {
+const GunProfile = ({ analysisResult, firearmInfo, isLoading, apiError }) => {
   // State for share notification
   const [showShareNotification, setShowShareNotification] = useState(false);
   // State for fullscreen mode
@@ -56,12 +56,49 @@ const GunProfile = ({ analysisResult, firearmInfo }) => {
     </div>
   );
 
+  // Loading component for API fetching
+  const LoadingState = () => (
+    <div className="flex justify-center items-center p-4">
+      <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[#990000]"></div>
+      <span className="ml-3 text-gray-600">กำลังค้นหาข้อมูลอาวุธ...</span>
+    </div>
+  );
+
+  // Error state when API call fails
+  const ErrorState = ({ message }) => (
+    <div className="p-4 text-red-600 text-sm">
+      เกิดข้อผิดพลาดในการค้นหาข้อมูล: {message}
+    </div>
+  );
+
   // Render firearm information from API
   const renderFirearmInfo = () => {
+    if (isLoading) {
+      return <LoadingState />;
+    }
+
+    if (apiError) {
+      return <ErrorState message={apiError} />;
+    }
+
     if (!firearmInfo) {
       return (
         <div className="mt-6">
           <h4 className="font-medium mb-2 text-red-600">ไม่พบข้อมูลในฐานข้อมูล</h4>
+          <p className="text-gray-500 text-sm">
+            ไม่สามารถค้นหาข้อมูลอาวุธปืนนี้ จากฐานข้อมูลได้ อาจเป็นเพราะ:
+          </p>
+          <ul className="text-gray-500 text-sm list-disc list-inside ml-2 mt-2">
+            <li>อาวุธนี้ไม่มีอยู่ในฐานข้อมูล</li>
+            <li>ชื่อยี่ห้อหรือรุ่นไม่ตรงกับในฐานข้อมูล</li>
+            <li>อาจมีปัญหาในการเชื่อมต่อกับฐานข้อมูล</li>
+          </ul>
+          <p className="mt-4 text-sm">
+            <span className="font-medium">ยี่ห้อที่ระบบตรวจพบ:</span> {analysisResult?.brandName || 'ไม่ทราบ'}
+          </p>
+          <p className="text-sm">
+            <span className="font-medium">รุ่นที่ระบบตรวจพบ:</span> {analysisResult?.modelName || 'ไม่ทราบ'}
+          </p>
         </div>
       );
     }
@@ -118,7 +155,7 @@ const GunProfile = ({ analysisResult, firearmInfo }) => {
                   {firearmInfo.model && <span className="ml-2">{firearmInfo.model}</span>}
                 </>
               ) : (
-                "รายละเอียดอาวุธปืน"
+                <>อาวุธปืน {analysisResult?.brandName && <span>{analysisResult.brandName}</span>} {analysisResult?.modelName && <span className="ml-1">{analysisResult.modelName}</span>}</>
               )}
             </h2>
             <button
@@ -225,7 +262,7 @@ const GunProfile = ({ analysisResult, firearmInfo }) => {
               {firearmInfo.model && <span className="ml-2">{firearmInfo.model}</span>}
             </>
           ) : (
-            "รายละเอียดอาวุธปืน"
+            <>อาวุธปืน {analysisResult?.brandName && <span>{analysisResult.brandName}</span>} {analysisResult?.modelName && <span className="ml-1">{analysisResult.modelName}</span>}</>
           )}
         </h2>
         <button
@@ -245,9 +282,22 @@ const GunProfile = ({ analysisResult, firearmInfo }) => {
           {/* Details on left */}
           <div className="flex-1">
             <h3 className="text-lg font-medium mb-2">รายละเอียด</h3>
-            {!firearmInfo ? (
+            {isLoading ? (
+              <LoadingState />
+            ) : apiError ? (
+              <ErrorState message={apiError} />
+            ) : !firearmInfo ? (
               <div className="py-2">
                 <span className="text-red-600 font-medium">ไม่พบข้อมูลในฐานข้อมูล</span>
+                <p className="text-gray-500 text-sm mt-2">
+                  ไม่สามารถค้นหาข้อมูลอาวุธปืนนี้ จากฐานข้อมูลได้
+                </p>
+                <p className="mt-4 text-sm">
+                  <span className="font-medium">ยี่ห้อที่ระบบตรวจพบ:</span> {analysisResult?.brandName || 'ไม่ทราบ'}
+                </p>
+                <p className="text-sm">
+                  <span className="font-medium">รุ่นที่ระบบตรวจพบ:</span> {analysisResult?.modelName || 'ไม่ทราบ'}
+                </p>
               </div>
             ) : (
               <>

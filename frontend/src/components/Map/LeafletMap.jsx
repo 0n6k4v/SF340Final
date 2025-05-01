@@ -3,6 +3,9 @@ import { MapContainer, TileLayer, GeoJSON, useMap, Tooltip, Circle, Polyline, Ma
 import 'leaflet/dist/leaflet.css';
 import axios from 'axios';
 import L from 'leaflet';
+import apiConfig from '../../config/api';
+
+const API_PATH = '/api';
 
 // Fix Leaflet icon issue
 delete L.Icon.Default.prototype._getIconUrl;
@@ -199,7 +202,7 @@ const LeafletMap = ({
     const fetchData = async () => {
       setLoading(true);
       try {
-        const provincesResponse = await axios.get('http://localhost:3001/api/provinces');
+        const provincesResponse = await axios.get(`${apiConfig.baseUrl}${API_PATH}/provinces`);
         const geojson = {
           type: "FeatureCollection",
           features: provincesResponse.data.map(p => ({
@@ -256,7 +259,7 @@ const LeafletMap = ({
         try {
           // เริ่มต้นดึงข้อมูลจริงจาก API
           const provinceIds = selectedProvinces.map(p => p.id).join(',');
-          const response = await axios.get(`http://localhost:3001/api/districts?provinces=${provinceIds}`);
+          const response = await axios.get(`${apiConfig.baseUrl}${API_PATH}/districts?provinces=${provinceIds}`);
           
           // แปลงข้อมูลให้อยู่ในรูปแบบ GeoJSON
           const geojson = {
@@ -312,7 +315,7 @@ const LeafletMap = ({
         try {
           // เริ่มต้นดึงข้อมูลจริงจาก API
           const districtIds = selectedDistricts.map(d => d.id).join(',');
-          const response = await axios.get(`http://localhost:3001/api/subdistricts?districts=${districtIds}`);
+          const response = await axios.get(`${apiConfig.baseUrl}${API_PATH}/subdistricts?districts=${districtIds}`);
           
           // แปลงข้อมูลให้อยู่ในรูปแบบ GeoJSON
           const geojson = {

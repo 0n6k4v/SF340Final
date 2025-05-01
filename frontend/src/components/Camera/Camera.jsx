@@ -6,7 +6,6 @@ const CameraPage = () => {
   const navigate = useNavigate();
   const [stream, setStream] = useState(null);
   const [facingMode, setFacingMode] = useState('environment');
-  const [selectedMode, setSelectedMode] = useState('อาวุปืน');
   const [currentResolution, setCurrentResolution] = useState('');
   const [isInitializing, setIsInitializing] = useState(true);
   
@@ -15,6 +14,7 @@ const CameraPage = () => {
   const [detectionResults, setDetectionResults] = useState(null);
   const [detectionConfidence, setDetectionConfidence] = useState(0);
   const [detectionClass, setDetectionClass] = useState('');
+  const [detectionType, setDetectionType] = useState(''); // 'weapon' or 'drug' or ''
   
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
@@ -93,6 +93,7 @@ const CameraPage = () => {
       }
       
       setIsInitializing(false);
+      startDetection(); // เริ่มตรวจจับทันทีที่กล้องพร้อม
     } catch (err) {
       console.error("Error accessing camera:", err);
       alert("ไม่สามารถเข้าถึงกล้องได้ โปรดใช้การอัพโหลดภาพแทน");
@@ -102,7 +103,7 @@ const CameraPage = () => {
 
   // Start real-time detection
   const startDetection = useCallback(() => {
-    if (selectedMode !== 'อาวุปืน' || !videoRef.current || !canvasRef.current) return;
+    if (!videoRef.current || !canvasRef.current) return;
     
     setIsDetecting(true);
     
@@ -126,9 +127,8 @@ const CameraPage = () => {
           // Create form data
           const formData = new FormData();
           formData.append('image', blob, 'frame.jpg');
-          formData.append('mode', 'อาวุปืน');
           
-          // Send to API
+          // Send to API - ไม่ต้องระบุโหมดแล้วเพราะ backend รู้เองได้
           const response = await fetch('https://e019-203-131-213-42.ngrok-free.app/api/detect', {
             method: 'POST',
             body: formData
@@ -139,11 +139,25 @@ const CameraPage = () => {
             
             // Update detection results
             setDetectionResults(result);
-            setDetectionConfidence(result.confidence || 0);
-            setDetectionClass(result.weaponType || '');
+            
+            // ตรวจสอบประเภทที่ตรวจพบ (ปืนหรือยา)
+            if (result.detectionType) {
+              setDetectionType(result.detectionType);
+              
+              if (result.detectionType === 'weapon') {
+                setDetectionConfidence(result.confidence || 0);
+                setDetectionClass(result.weaponType || 'อาวุธปืน');
+              } else if (result.detectionType === 'drug') {
+                // ถ้าเป็นยา ใช้ข้อมูลที่เหมาะสม
+                setDetectionConfidence(result.confidence || 0);
+                setDetectionClass('ยาเสพติด');
+              }
+            }
             
             // Draw detections on overlay canvas if detections exist
-            if (result.detections && result.detections.length > 0) {
+            if (result.allDetections && result.allDetections.length > 0) {
+              drawDetections(result.allDetections);
+            } else if (result.detections && result.detections.length > 0) {
               drawDetections(result.detections);
             } else {
               // Clear overlay if no detections
@@ -161,7 +175,7 @@ const CameraPage = () => {
     }, 500); // Adjust interval as needed (500ms = 2fps)
     
     detectionIntervalRef.current = detectionInterval;
-  }, [selectedMode]);
+  }, []);
   
   // Function to draw bounding boxes on overlay canvas
   const drawDetections = (detections) => {
@@ -179,20 +193,23 @@ const CameraPage = () => {
     
     // Draw each detection
     detections.forEach(detection => {
-      const [x1, y1, x2, y2] = detection.box;
-      const width = x2 - x1;
-      const height = y2 - y1;
-      
-      // Draw bounding box
-      ctx.strokeStyle = '#FF0000';
-      ctx.lineWidth = 3;
-      ctx.strokeRect(x1, y1, width, height);
-      
-      // Draw label
-      ctx.fillStyle = '#FF0000';
-      ctx.font = 'bold 16px Arial';
-      const label = `${detection.class} ${Math.round(detection.confidence * 100)}%`;
-      ctx.fillText(label, x1, y1 > 20 ? y1 - 5 : y1 + 20);
+      // ตรวจสอบว่ามี box coordinates หรือไม่
+      if (detection.box && detection.box.length === 4) {
+        const [x1, y1, x2, y2] = detection.box;
+        const width = x2 - x1;
+        const height = y2 - y1;
+        
+        // Draw bounding box
+        ctx.strokeStyle = '#FF0000';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(x1, y1, width, height);
+        
+        // Draw label
+        ctx.fillStyle = '#FF0000';
+        ctx.font = 'bold 16px Arial';
+        const label = `${detection.class} ${Math.round(detection.confidence * 100)}%`;
+        ctx.fillText(label, x1, y1 > 20 ? y1 - 5 : y1 + 20);
+      }
     });
   };
   
@@ -224,19 +241,6 @@ const CameraPage = () => {
       stopDetection();
     };
   }, [facingMode, startCamera, stopDetection]);
-  
-  // Start or stop detection based on selected mode
-  useEffect(() => {
-    if (selectedMode === 'อาวุปืน' && !isInitializing) {
-      startDetection();
-    } else {
-      stopDetection();
-    }
-    
-    return () => {
-      stopDetection();
-    };
-  }, [selectedMode, isInitializing, startDetection, stopDetection]);
 
   const handleClose = () => {
     if (streamRef.current) {
@@ -250,7 +254,7 @@ const CameraPage = () => {
     setFacingMode(prev => prev === 'environment' ? 'user' : 'environment');
   };
 
-  // ปรับปรุงวิธีการถ่ายภาพให้เร็วขึ้น
+  // ปรับปรุงวิธีการถ่ายภาพ
   const captureImage = async () => {
     if (isInitializing) return; // ไม่ดำเนินการถ้ายังไม่พร้อม
     
@@ -260,27 +264,28 @@ const CameraPage = () => {
     if (!video || !canvas) return;
     
     try {
-      // ใช้ canvas เป็นวิธีหลัก เพราะทำงานได้กับทุกอุปกรณ์และเร็วกว่า
+      // ใช้ canvas เพื่อจับภาพ
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       
       const context = canvas.getContext('2d', { alpha: false });
       context.drawImage(video, 0, 0);
       
-      // ใช้ dataURL โดยตรงแทนการสร้าง Blob URL เพื่อความเร็ว
-      // ใช้คุณภาพ JPEG สูง (0.95) เพื่อรักษาความคมชัด
       const imageData = canvas.toDataURL('image/jpeg', 0.95);
       const resolution = `${canvas.width}x${canvas.height}`;
       
-      // นำทางไปยัง ImagePreview ทันที
+      // นำทางไปยัง ImagePreview ด้วยข้อมูลที่ได้
       navigate('/imagePreview', { 
         state: { 
           imageData: imageData, 
-          mode: selectedMode,
+          // ไม่ต้องส่ง mode แล้ว เพราะ API จะตรวจสอบเอง
           resolution: resolution,
           fromCamera: true,
+          sourcePath: '/camera',
           viewMode: 'cover',
-          detectionResults: detectionResults  // Pass detection results if available
+          detectionResults: detectionResults,
+          // ส่งข้อมูลที่ตรวจพบเบื้องต้นไปด้วย
+          detectedType: detectionType || 'unknown'
         } 
       });
     } catch (err) {
@@ -290,35 +295,38 @@ const CameraPage = () => {
   };
 
   const selectFromGallery = () => {
-    if (isInitializing) return;
-    
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
-    input.onchange = async (e) => {
-      try {
+    
+    input.onchange = (e) => {
+      if (e.target.files && e.target.files[0]) {
         const file = e.target.files[0];
-        if (file) {
-          // สร้าง FileReader เพื่อให้ทำงานเร็วขึ้น
-          const reader = new FileReader();
-          reader.onload = (event) => {
-            navigate('/imagePreview', { 
-              state: { 
-                imageData: event.target.result,
-                mode: selectedMode,
-                fromCamera: false,
-                viewMode: 'contain'  // รูปภาพจากแกลเลอรี่ใช้ contain
-              } 
-            });
-          };
-          reader.readAsDataURL(file);  // อ่านเป็น data URL เลย เร็วกว่า Blob URL
-        }
-      } catch (err) {
-        console.error('Error processing gallery image:', err);
-        alert('เกิดข้อผิดพลาดในการโหลดภาพ กรุณาลองอีกครั้ง');
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          // Note that this is an upload but from the camera page
+          navigate('/imagePreview', { 
+            state: { 
+              imageData: event.target.result, 
+              // ไม่ต้องส่ง mode แล้ว
+              fromCamera: false,
+              uploadFromCameraPage: true,
+              sourcePath: '/camera'
+            } 
+          });
+        };
+        reader.readAsDataURL(file);
       }
     };
+    
     input.click();
+  };
+
+  // คำนวณสีไฮไลท์ตามประเภทที่ตรวจพบ
+  const getHighlightColor = () => {
+    if (detectionType === 'weapon') return 'bg-red-500';
+    if (detectionType === 'drug') return 'bg-purple-500';
+    return 'bg-gray-500';
   };
 
   return (
@@ -364,38 +372,31 @@ const CameraPage = () => {
           className="absolute top-0 left-0 h-full w-full object-cover pointer-events-none"
         />
         
-        {/* Detection Indicator */}
+        {/* Detection Indicator - แสดงทั้งปืนและยา */}
         {isDetecting && detectionConfidence > 0.5 && (
-          <div className="absolute top-16 left-1/2 transform -translate-x-1/2 bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg z-20">
-            <div className="font-bold text-center">{detectionClass || 'อาวุธปืน'} ตรวจพบ</div>
-            <div className="text-sm text-center">ความมั่นใจ: {Math.round(detectionConfidence * 100)}%</div>
+          <div className={`absolute top-16 left-1/2 transform -translate-x-1/2 ${getHighlightColor()} text-white px-4 py-2 rounded-lg shadow-lg z-20`}>
+            <div className="font-bold text-center">
+              {detectionType === 'weapon' ? 'อาวุธปืน' : 
+                detectionType === 'drug' ? 'ยาเสพติด' : 
+                'วัตถุอันตราย'} ตรวจพบ
+            </div>
+            <div className="text-sm text-center">
+              {detectionClass && `ประเภท: ${detectionClass}`}
+            </div>
+            <div className="text-sm text-center">
+              ความมั่นใจ: {Math.round(detectionConfidence * 100)}%
+            </div>
           </div>
         )}
       </div>
 
-      {/* Bottom Controls */}
+      {/* Bottom Controls - ลบส่วนเลือกโหมดออก */}
       <div className="absolute bottom-0 left-0 right-0 bg-black/80 pb-6">
-        {/* Mode Selection */}
-        <div className="flex justify-around py-2 mb-4">
-          <button 
-            className={`px-6 py-2 rounded-full text-sm ${selectedMode === 'อาวุปืน' ? 'bg-white text-black' : 'text-white'}`}
-            onClick={() => setSelectedMode('อาวุปืน')}
-          >
-            อาวุปืน
-          </button>
-          <button 
-            className={`px-6 py-2 rounded-full text-sm ${selectedMode === 'ยาเสพติด' ? 'bg-white text-black' : 'text-white'}`}
-            onClick={() => setSelectedMode('ยาเสพติด')}
-          >
-            ยาเสพติด
-          </button>
-        </div>
-
-        {/* Detection status indicator (when in weapon mode) */}
-        {selectedMode === 'อาวุปืน' && !isInitializing && (
-          <div className="flex justify-center mb-2">
+        {/* Detection status indicator */}
+        {!isInitializing && (
+          <div className="flex justify-center mb-4 mt-2">
             <div className={`px-3 py-1 rounded-full text-xs ${isDetecting ? 'bg-green-500' : 'bg-gray-500'}`}>
-              {isDetecting ? 'กำลังตรวจจับ' : 'ไม่ได้ตรวจจับ'}
+              {isDetecting ? 'กำลังตรวจจับอัตโนมัติ' : 'ไม่ได้ตรวจจับ'}
             </div>
           </div>
         )}

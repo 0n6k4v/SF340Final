@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import apiConfig from '../../config/api';
+
+const API_PATH = '/api';
 
 const GunCard = ({ gun }) => {
 
@@ -548,20 +551,21 @@ const GunCatalog = () => {
     // ดึงข้อมูลจาก API
     useEffect(() => {
         setLoading(true);
-        fetch('http://localhost:3001/api/firearms')
+        fetch(`${apiConfig.baseUrl}${API_PATH}/exhibits`)
             .then(res => res.json())
             .then(data => {
+                // แปลงโครงสร้างข้อมูลจาก API ใหม่ให้เข้ากับโครงสร้างเดิม
                 const mapped = (Array.isArray(data) ? data : []).map(item => ({
-                    id: item.exhibit?.id ?? item.exhibit_id ?? item.id,
-                    image: item.exhibit?.images?.length
-                        ? item.exhibit.images.map(img => img.image_url)
+                    id: item.id,
+                    image: item.images?.length
+                        ? item.images.map(img => img.image_url)
                         : [],
-                    mechanism: item.mechanism,
-                    brand: item.brand,
-                    series: item.series,
-                    model: item.model,
-                    subcategories: item.exhibit?.subcategory ?? '',
-                    categories: item.exhibit?.category ?? '', // เพิ่ม categories สำหรับ filter ประเภท
+                    mechanism: item.firearm.mechanism,
+                    brand: item.firearm.brand,
+                    series: item.firearm.series,
+                    model: item.firearm.model,
+                    subcategories: item.subcategory ?? '',
+                    categories: item.category ?? '',
                     caliber: item.caliber ?? [],
                 }));
                 setGuns(mapped);
@@ -820,7 +824,7 @@ const GunCatalog = () => {
                     <button
                         className="p-2 hover:bg-gray-100 rounded-full"
                         onClick={handleOpenFilterModal}
-                         aria-label="Open filters"
+                        aria-label="Open filters"
                     >
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
@@ -916,7 +920,7 @@ const GunCatalog = () => {
                         onClick={handleOpenFilterModal}
                         aria-label="Open filters"
                     >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 24 24" stroke="currentColor">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
                         </svg>
                     </button>
@@ -992,7 +996,10 @@ const GunCatalog = () => {
     return (
         <>
             {loading ? (
-                <div className="flex justify-center items-center h-96 text-gray-500">กำลังโหลดข้อมูล...</div>
+              <div className="flex flex-col justify-center items-center h-full w-full fixed inset-0 bg-[#F8F9FA] z-10">
+                <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-t-2 border-[#b30000] mb-4"></div>
+                <p className="text-gray-600 font-medium">กำลังโหลดข้อมูล...</p>
+              </div>
             ) : (
                 isMobileView ? <MobileLayout /> : <DesktopLayout />
             )}

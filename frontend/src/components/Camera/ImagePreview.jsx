@@ -13,6 +13,7 @@ const ImagePreview = () => {
   const [error, setError] = useState(null);
   const [fromCamera, setFromCamera] = useState(false);
   const [viewMode, setViewMode] = useState('contain');
+  const [fromUpload, setFromUpload] = useState(false);
 
   // Extract image data and mode from navigation state
   useEffect(() => {
@@ -21,10 +22,9 @@ const ImagePreview = () => {
       setMode(location.state.mode);
       setResolution(location.state.resolution || '');
       setFromCamera(location.state.fromCamera || false);
-      // ใช้ viewMode ที่ได้รับจากหน้ากล้อง เพื่อควบคุมการแสดงภาพให้สอดคล้องกับหน้ากล้อง
+      setFromUpload(location.state.uploadFromCameraPage || false);
       setViewMode(location.state.viewMode || 'contain');
     } else {
-      // Fallback if no image data
       navigate('/home');
     }
   }, [location.state, navigate]);
@@ -54,122 +54,204 @@ const ImagePreview = () => {
     navigate('/home');
   };
 
-  // ฟังก์ชัน normalize ชื่ออาวุธ
-  const normalizeWeaponName = (name) => {
-    if (!name) return '';
-    return name
-      .toLowerCase()
-      .replace(/[\s_\-]/g, '') // ลบช่องว่าง, _ และ -
-      .replace(/[^a-z0-9]/g, ''); // ลบอักขระพิเศษอื่นๆ
+  // ปรับปรุงฟังก์ชัน resizeImage ให้รักษาคุณภาพของภาพได้ดีขึ้น
+  const resizeImage = (dataUrl, maxWidth = 1600, maxHeight = 1600, quality = 0.95) => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+        
+        // ถ้าภาพมีขนาดเล็กอยู่แล้ว ไม่ต้อง resize
+        if (width <= maxWidth && height <= maxHeight) {
+          console.log("Image already small enough, not resizing");
+          resolve(dataUrl);
+          return;
+        }
+        
+        // คำนวณขนาดใหม่โดยรักษา aspect ratio
+        if (width > height) {
+          if (width > maxWidth) {
+            height = Math.round(height * (maxWidth / width));
+            width = maxWidth;
+          }
+        } else {
+          if (height > maxHeight) {
+            width = Math.round(width * (maxHeight / height));
+            height = maxHeight;
+          }
+        }
+        
+        console.log(`Resizing image from ${img.width}x${img.height} to ${width}x${height}`);
+        
+        // สร้าง canvas และวาดภาพที่ resize แล้ว
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        
+        const ctx = canvas.getContext('2d');
+        // ใช้ imageSmoothingQuality สูงสุด
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        // แปลงเป็น data URL ด้วยคุณภาพสูง
+        // หากเป็นภาพ PNG ให้ใช้ PNG เพื่อรักษาคุณภาพ
+        const imageType = dataUrl.startsWith('data:image/png') ? 'image/png' : 'image/jpeg';
+        const resizedDataUrl = canvas.toDataURL(imageType, quality);
+        resolve(resizedDataUrl);
+      };
+      
+      img.onerror = reject;
+      img.src = dataUrl;
+    });
   };
 
-  // Existing handleSubmit method
+  // Function to navigate to CandidateShow with unknown object
+  const navigateToUnknownObject = () => {
+    // Create unknown object result
+    const unknownResult = {
+      isUnknown: true
+    };
+    
+    navigate('/candidateShow', { 
+      state: { 
+        result: unknownResult,
+        image: imageData,
+        fromCamera: fromCamera,
+        uploadFromCameraPage: location.state?.uploadFromCameraPage || false,
+        sourcePath: location.state?.sourcePath || -1,
+        imageData: imageData
+      } 
+    });
+  };
+
+  // แก้ไขฟังก์ชัน handleSubmit
   const handleSubmit = async () => {
     try {
       setIsProcessing(true);
       setError(null);
       
-      // ล้างข้อมูลเก่าใน localStorage ก่อนเพื่อป้องกันการแสดงข้อมูลเก่า
+      // ล้างข้อมูลเก่าใน localStorage
       localStorage.removeItem('analysisResult');
       localStorage.removeItem('firearmInfo');
       localStorage.removeItem('currentEvidenceData');
       
-      // หลังจากล้างข้อมูลเก่าแล้วค่อยบันทึกภาพใหม่
+      // บันทึกภาพใหม่
       try {
         localStorage.setItem('analysisImage', imageData);
       } catch (storageError) {
         console.warn("Failed to store image in localStorage:", storageError);
-        // ถ้าเก็บภาพไม่ได้ให้ตั้งค่าตัวแปรบอกว่าไม่มีภาพ
         localStorage.setItem('noAnalysisImage', 'true');
       }
       
-      // แปลง dataURL เป็น Blob (เฉพาะในกรณีที่ imageData เป็น dataURL)
-      let imageBlob;
-      if (imageData.startsWith('data:')) {
-        // แปลง dataURL เป็น Blob
-        const response = await fetch(imageData);
-        imageBlob = await response.blob();
-      } else {
-        // กรณี URL.createObjectURL ให้โหลดข้อมูลจาก URL
-        const response = await fetch(imageData);
-        imageBlob = await response.blob();
-      }
+      // ใช้ภาพต้นฉบับทดลองก่อน หาก resize แล้วยังมีปัญหา
+      let imageToSend = imageData;
       
-      // Create form data
-      const formData = new FormData();
-      formData.append('image', imageBlob, 'captured_image.jpg');
-      formData.append('mode', mode);
+      // ตรวจสอบขนาดไฟล์ภาพ: ทำ resize เฉพาะภาพใหญ่เกินไปเท่านั้น
+      const isLargeImage = imageData.length > 1000000; // ประมาณ 1MB
       
-      // Send to backend API
-      const response = await fetch(`http://localhost:8000/api/analyze`, {
-        method: 'POST',
-        body: formData,
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Server responded with status: ${response.status}`);
-      }
-      
-      const result = await response.json();
-      
-      // Normalize result format
-      const normalizedResult = normalizeResult(result, mode);
-
-      let firearmInfo = null;
-      if (mode === 'อาวุปืน' && normalizedResult.weaponType) {
-        const normalizedName = normalizeWeaponName(normalizedResult.weaponType);
-        const firearmRes = await fetch(
-          `http://localhost:3001/api/firearms?normalized_name=${encodeURIComponent(normalizedName)}`
-        );
-        if (firearmRes.ok) {
-          const firearms = await firearmRes.json();
-          firearmInfo = firearms[0] || null;
+      if (isLargeImage) {
+        try {
+          console.log("Image is large, attempting resize");
+          const resizedImage = await resizeImage(imageData, 1600, 1600, 0.95);
           
-          // ถ้าพบข้อมูลปืน ให้บันทึกลงใน localStorage
-          if (firearmInfo) {
-            localStorage.setItem('firearmInfo', JSON.stringify(firearmInfo));
-            
-            // เพิ่ม id ของ exhibit ลงใน normalizedResult
-            if (firearmInfo.exhibit && firearmInfo.exhibit.id) {
-              normalizedResult.exhibit_id = firearmInfo.exhibit.id;
-            }
+          // ถ้า resize สำเร็จและได้ภาพที่เล็กลงจริงๆ
+          if (resizedImage.length < imageData.length * 0.9) {
+            console.log(`Image successfully resized: ${imageData.length} -> ${resizedImage.length}`);
+            imageToSend = resizedImage;
           } else {
-            // ถ้าไม่พบข้อมูลให้ตั้งค่าตัวแปรบอกว่าไม่มีข้อมูลใน database
-            localStorage.setItem('noFirearmInfo', 'true');
+            console.log("Resize didn't reduce image size significantly, using original");
           }
+        } catch (resizeError) {
+          console.error("Error resizing image:", resizeError);
+          // ถ้า resize ไม่สำเร็จใช้ภาพต้นฉบับ
         }
+      } else {
+        console.log("Image is small enough, no resize needed");
       }
+      
+      // สร้าง Blob
+      let blob;
+      try {
+        blob = await fetch(imageToSend).then(r => r.blob());
+      } catch (error) {
+        console.error("Error creating blob:", error);
+        navigateToUnknownObject();
+        return;
+      }
+      
+      // สร้าง FormData
+      const formData = new FormData();
+      formData.append('image', blob, 'image.jpg');
+      
+      console.log("Form data created, blob size:", blob.size);
+      
+      // สร้างตัวจับเวลาและตัวควบคุม abort
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 20000); // เพิ่มเวลา timeout เป็น 20 วินาที
+      
+      try {
+        // ส่งคำขอไปยัง API
+        const response = await fetch('http://localhost:8000/api/analyze', {
+          method: 'POST',
+          body: formData,
+          signal: controller.signal
+        });
+        
+        // ยกเลิก timeout
+        clearTimeout(timeoutId);
+        
+        console.log("Response status:", response.status);
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+          console.error("API Error:", errorData);
+          navigateToUnknownObject();
+          return;
+        }
+        
+        const result = await response.json();
+        console.log("Analysis result:", result);
+        
+        // ตรวจสอบผลลัพธ์ว่าถูกต้องหรือไม่
+        const isValidResult = result && 
+          (result.detected_objects || result.detections || result.prediction || result.details);
+        
+        if (!isValidResult) {
+          console.error("Invalid result structure:", result);
+          navigateToUnknownObject();
+          return;
+        }
+        
+        // บันทึกผลลัพธ์ลงใน localStorage
+        localStorage.setItem('analysisResult', JSON.stringify(result));
 
-      // บันทึกผลการวิเคราะห์ลงใน localStorage
-      localStorage.setItem('analysisResult', JSON.stringify(normalizedResult));
-
-      // Navigate to results page
-      if (mode === 'ยาเสพติด') {
-        navigate('/evidenceProfile', { state: { type: 'Drug', result: normalizedResult } });
-      } else if (mode === 'อาวุปืน') {
-        navigate('/evidenceProfile', { state: { type: 'Gun', result: normalizedResult, firearmInfo } });
+        // นำทางไปยัง candidateShow
+        navigate('/candidateShow', { 
+          state: { 
+            result: result,
+            image: imageData, // ส่งภาพต้นฉบับไปแสดงผล (คุณภาพดี)
+            fromCamera: fromCamera,
+            uploadFromCameraPage: location.state?.uploadFromCameraPage || false,
+            sourcePath: location.state?.sourcePath || -1
+          } 
+        });
+      } catch (fetchError) {
+        console.error("Fetch error:", fetchError);
+        if (fetchError.name === 'AbortError') {
+          console.log("Request timed out after 20 seconds");
+        }
+        navigateToUnknownObject();
       }
       
     } catch (err) {
       console.error("Error processing image:", err);
-      setError(err.message || 'Failed to process image');
+      navigateToUnknownObject();
+    } finally {
       setIsProcessing(false);
     }
-  };
-
-  // Normalize result for consistent format
-  const normalizeResult = (result, mode) => {
-    if (mode === 'ยาเสพติด') {
-      return result;
-    } else if (mode === 'อาวุปืน') {
-      return {
-        detected: result.detected,
-        confidence: result.confidence,
-        weaponType: result.weaponType,
-        detections: result.detections,
-      };
-    }
-    return result;
   };
 
   // If no image data, don't render anything
@@ -177,7 +259,7 @@ const ImagePreview = () => {
 
   // Mobile Version
   const MobilePreview = () => (
-    <div className="fixed inset-0 bg-black flex flex-col">
+    <div className="fixed inset-0 bg-black flex flex-col h-screen">
       {/* Header */}
       <div className="relative p-4 flex justify-start items-center bg-black/80">
         <button 
@@ -195,21 +277,27 @@ const ImagePreview = () => {
         )}
       </div>
 
-      {/* Image preview */}
-      <div className="flex-1 relative">
-        <img 
-          src={imageData} 
-          alt="Preview" 
-          className={`w-full h-full object-${viewMode}`}
-        />
-        <div className="absolute top-4 right-4">
-          <span className="px-4 py-2 rounded-full bg-black/50 text-white text-sm">
-            {mode === 'ยาเสพติด' ? '🔍 ตรวจจับยาเสพติด' : '🔍 ตรวจจับอาวุธปืน'}
-          </span>
+      {/* Image preview - แก้ไขตรงนี้ */}
+      <div className="flex-1 overflow-hidden relative flex items-center justify-center">
+        <div className="relative w-full h-full max-h-[calc(100vh-180px)]">
+          <img 
+            src={imageData} 
+            alt="Preview" 
+            className="w-full h-full object-contain"
+          />
         </div>
         
+        {/* แสดงป้ายประเภทเฉพาะเมื่อมีการระบุ mode จากการอัพโหลด (ไม่ใช่จากหน้า Camera) */}
+        {mode && !fromCamera && (
+          <div className="absolute top-4 right-4">
+            <span className="px-4 py-2 rounded-full bg-black/50 text-white text-sm">
+              {mode === 'ยาเสพติด' ? '🔍 ตรวจจับยาเสพติด' : '🔍 ตรวจจับอาวุธปืน'}
+            </span>
+          </div>
+        )}
+        
         {error && (
-          <div className="absolute bottom-20 left-0 right-0 mx-auto w-full max-w-md">
+          <div className="absolute bottom-4 left-0 right-0 mx-auto w-full max-w-md px-4">
             <div className="bg-red-500 text-white p-3 rounded-lg text-center">
               {error}
             </div>
@@ -217,8 +305,8 @@ const ImagePreview = () => {
         )}
       </div>
 
-      {/* Action Buttons */}
-      <div className="p-6 bg-black/80 space-y-4">
+      {/* Action Buttons - ตรึงไว้ด้านล่างเสมอ */}
+      <div className="p-6 bg-black/80 space-y-4 w-full">
         <button
           onClick={handleSubmit}
           disabled={isProcessing}
@@ -270,11 +358,15 @@ const ImagePreview = () => {
               alt="Preview" 
               className={`max-h-full max-w-full object-${viewMode} border border-gray-800`}
             />
-            <div className="absolute top-4 right-4">
-              <span className="px-4 py-2 rounded-full bg-black/50 text-white">
-                {mode === 'ยาเสพติด' ? '🔍 ตรวจจับยาเสพติด' : '🔍 ตรวจจับอาวุธปืน'}
-              </span>
-            </div>
+            
+            {/* แสดงป้ายประเภทเฉพาะเมื่อมีการระบุ mode จากการอัพโหลด (ไม่ใช่จากหน้า Camera) */}
+            {mode && !fromCamera && (
+              <div className="absolute top-4 right-4">
+                <span className="px-4 py-2 rounded-full bg-black/50 text-white">
+                  {mode === 'ยาเสพติด' ? '🔍 ตรวจจับยาเสพติด' : '🔍 ตรวจจับอาวุธปืน'}
+                </span>
+              </div>
+            )}
           </div>
         </div>
         
