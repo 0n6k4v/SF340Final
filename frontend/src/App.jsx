@@ -11,9 +11,14 @@ import EvidenceProfile from './pages/EvidenceProfile';
 import SaveToHistory from './pages/SaveToHistory';
 import Map from './pages/Map';
 import History from './pages/History';
+import SelectCatalogType from './pages/SelectCatalogType';
 import EvidenceHistoryProfile from './pages/EvidenceHistoryProfile';
 import EditGunHistoryProfile from './components/History/EditGunHistoryProfile';
 import Dashboard from './pages/Dashboard';
+import GunCatalog from './components/EvidenceCatalog/GunCatalog';
+import GunProfile from './components/EvidenceCatalog/GunProfile';
+import DrugCatalog from './components/EvidenceCatalog/DrugCatalog';
+import DrugProfile from './components/EvidenceCatalog/DrugProfile';
 
 const App = () => {
   return (
@@ -30,6 +35,13 @@ const App = () => {
 
       {/* Layout 2 */}
       <Route element={<Layout2 />}>
+        {/* Select Catalog Type */}
+        <Route path='/selectCatalogType/' element={<SelectCatalogType />} />
+        <Route path='/selectCatalogType/guns-catalog'element={<GunCatalog />} />
+        <Route path='/selectCatalogType/guns-catalog/gun-profile/:id' element={<GunProfile />} />
+        <Route path='/selectCatalogType/drugs-catalog' element={<DrugCatalog />} />
+        <Route path='/selectCatalogType/drugs-catalog/drug-profile/:id' element={<DrugProfile />} />
+
         {/* Dashboard */}
         <Route path="/dashboard" element={<Dashboard />} />
         
