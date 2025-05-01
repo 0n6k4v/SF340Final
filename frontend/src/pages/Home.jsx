@@ -6,23 +6,23 @@ import ImagePreview from '../components/Camera/ImagePreview';
 import { useNavigate } from 'react-router-dom';
 
 // Memoized Feature Button Component
-const FeatureButton = memo(({ Icon, label }) => (
-  <button 
+const FeatureButton = memo(({ Icon, label, path }) => (
+  <Link to={path}
     className="bg-[#F5F5F5] rounded-lg shadow p-4 flex flex-col items-center justify-center aspect-square transition-all duration-300 hover:bg-white hover:shadow-md hover:scale-105 hover:text-red-800"
   >
     <Icon className="w-8 h-8 text-[#333333] mb-6 transition-colors group-hover:text-red-800" />
     <p className="text-center text-sm">{label}</p>
-  </button>
+  </Link>
 ));
 
 // Memoized Mobile Feature Icon
-const MobileFeatureIcon = memo(({ Icon, label }) => (
-  <div className="flex flex-col items-center">
+const MobileFeatureIcon = memo(({ Icon, label, path }) => (
+  <Link to={path} className="flex flex-col items-center">
     <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mb-2 transition-all duration-300 hover:bg-red-50 hover:scale-110">
       <Icon className="w-6 h-6 text-gray-600 transition-colors hover:text-red-800" />
     </div>
     <span className="text-xs text-center">{label}</span>
-  </div>
+  </Link>
 ));
 
 // Dropdown Component
@@ -55,13 +55,26 @@ const Home = () => {
     { label: "ยาเสพติด", mode: 'ยาเสพติด' }
   ];
 
+  const features = [
+    { Icon: FaHistory, label: "ประวัติ", path: "/history" },
+    { Icon: FaFolderOpen, label: "บัญชีวัตถุพยาน", path: "/selectCatalogType" },
+    { Icon: FaChartSimple, label: "สถิติ", path: "/statistics" },
+    { Icon: FaMapLocationDot, label: "แผนที่", path: "/map" }
+  ];
+
   const handleFileUpload = (file, mode) => {
     if (file) {
       const reader = new FileReader();
       reader.onload = (event) => {
-        setUploadedImage(event.target.result);
-        setSelectedMode(mode);
-        setDropdownOpen(false);
+        navigate('/imagePreview', { 
+          state: { 
+            imageData: event.target.result, 
+            mode: mode,
+            fromCamera: false,
+            uploadFromCameraPage: false,
+            sourcePath: '/home'
+          } 
+        });
       };
       reader.readAsDataURL(file);
     }
@@ -81,7 +94,9 @@ const Home = () => {
           navigate('/imagePreview', { 
             state: { 
               imageData: event.target.result, 
-              mode: option.mode 
+              mode: option.mode,
+              sourcePath: '/home', // Add this to track the source
+              fromCamera: false
             } 
           });
         };
@@ -158,6 +173,21 @@ const Home = () => {
               </div>
             </div>
           </div>
+
+          {/* Feature Section with white background and spacing */}
+          <div className="w-full bg-white mt-auto py-8 px-4">
+            <h2 className="text-lg font-medium mb-6">ฟีเจอร์อื่นๆ</h2>
+            <div className="grid grid-cols-4 gap-4">
+              {features.map((feature, index) => (
+                <MobileFeatureIcon 
+                  key={index} 
+                  Icon={feature.Icon} 
+                  label={feature.label} 
+                  path={feature.path}
+                />
+              ))}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -196,6 +226,12 @@ const Home = () => {
                 </div>
               )}
             </div>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-3xl mx-auto">
+            {features.map((feature, index) => (
+              <FeatureButton key={index} Icon={feature.Icon} label={feature.label} path={feature.path} />
+            ))}
           </div>
         </div>
       </div>

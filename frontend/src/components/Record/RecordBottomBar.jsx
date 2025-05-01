@@ -126,7 +126,7 @@ const RecordBottomBar = ({
       
       console.log('บันทึกประวัติสำเร็จ:', response.data);
 
-      navigate('/home', {
+      navigate('/history', {
         state: {
           popup: {
             open: true,

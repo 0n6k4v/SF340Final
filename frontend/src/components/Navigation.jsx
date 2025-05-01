@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { FiMenu, FiChevronDown, FiChevronUp, FiX } from 'react-icons/fi';
-import { FaHome, FaCamera, FaUpload, FaPills } from "react-icons/fa";
+import { FaHome, FaCamera, FaUpload, FaPills, FaHistory } from "react-icons/fa";
+import { FaMapLocationDot, FaFolderOpen, FaChartSimple } from "react-icons/fa6";
 import { GiPistolGun } from "react-icons/gi";
 import { useNavigate, useLocation } from 'react-router-dom';
 
@@ -8,15 +9,17 @@ const Navigation = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [isMobile, setIsMobile] = useState(false);
-  const [isSidebarOpen, setSidebarOpen] = useState(true);
+  // Initialize sidebar state from localStorage or default to false (hidden)
+  const [isSidebarOpen, setSidebarOpen] = useState(() => {
+    const savedState = localStorage.getItem('sidebarState');
+    return savedState ? JSON.parse(savedState) : false;
+  });
   const [isUploadDropdownOpen, setUploadDropdownOpen] = useState(false);
   const [isBottomSheetOpen, setBottomSheetOpen] = useState(false);
-  const [isUploadDropupOpen, setIsUploadDropupOpen] = useState(false); // New state for mobile upload dropup
   const [sheetTranslateY, setSheetTranslateY] = useState('100%');
   const [sheetTransition, setSheetTransition] = useState('transform 0.3s ease-out');
   
   const dropdownRef = useRef(null);
-  const uploadDropupRef = useRef(null); // Ref for dropup menu
   const bottomSheetRef = useRef(null);
   const startY = useRef(0);
   const currentY = useRef(0);
@@ -34,14 +37,11 @@ const Navigation = () => {
     const checkScreenSize = () => {
       const mobile = window.innerWidth < 768;
       setIsMobile(mobile);
+      // Only auto-open sidebar on desktop if the saved state is "open"
       if (mobile) {
         setSidebarOpen(false);
-        setUploadDropdownOpen(false);
-      } else {
-        setSidebarOpen(true);
-        setBottomSheetOpen(false);
-        setIsUploadDropupOpen(false);
       }
+      // Don't force sidebar open on desktop - respect the saved state
     };
     
     checkScreenSize();
@@ -49,26 +49,23 @@ const Navigation = () => {
     return () => window.removeEventListener('resize', checkScreenSize);
   }, []);
 
-  // Close dropdowns when clicking outside
+  // Save sidebar state to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('sidebarState', JSON.stringify(isSidebarOpen));
+  }, [isSidebarOpen]);
+
+  // Close dropdown when clicking outside or when sidebar collapses
   useEffect(() => {
     const handleClickOutside = (event) => {
-      // For sidebar dropdown
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+      // For collapsed sidebar dropdown
+      if (!isSidebarOpen && dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setUploadDropdownOpen(false);
-      }
-      
-      // For bottom sheet
-      if (isBottomSheetOpen && bottomSheetRef.current && !bottomSheetRef.current.contains(event.target)) {
-        const uploadButton = document.getElementById('mobile-upload-button');
-        if (!uploadButton || !uploadButton.contains(event.target)) {
-          closeBottomSheet();
-        }
       }
     };
     
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isUploadDropdownOpen, isBottomSheetOpen]);
+  }, [isUploadDropdownOpen, isSidebarOpen]);
 
   // Close dropdown when sidebar collapses
   useEffect(() => {
@@ -85,7 +82,7 @@ const Navigation = () => {
           if (sheetHeight.current === 0) {
             sheetHeight.current = bottomSheetRef.current.offsetHeight;
           }
-          setSheetTranslateY('0%');
+          setSheetTranslateY('0%'); // Animate open
           setSheetTransition('transform 0.3s ease-out');
         }
       });
@@ -95,33 +92,55 @@ const Navigation = () => {
     }
   }, [isBottomSheetOpen]);
 
-  // Filtered menu items lists
-  const sidebarItems = [
-    { id: 'home', icon: <FaHome size={24} />, text: "หน้าหลัก", path: "/home" },
-    { id: 'camera', icon: <FaCamera size={24} />, text: "ถ่ายภาพ", path: "/camera" },
-    { id: 'upload', icon: <FaUpload size={24} />, text: "อัพโหลดภาพ", path: "/upload", hasDropdown: true },
+  // Close bottom sheet when clicking outside backdrop
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (isBottomSheetOpen &&
+          bottomSheetRef.current &&
+          !bottomSheetRef.current.contains(event.target)) {
+        if (event.target.id === 'bottom-sheet-backdrop') {
+          closeBottomSheet();
+        }
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isBottomSheetOpen]);
+
+  const menuItems = [
+    { id: 'home', icon: <FaHome size={24} />, text: "หน้าหลัก", path: "/home", showInBottom: true },
+    { id: 'camera', icon: <FaCamera size={24} />, text: "ถ่ายภาพ", path: "/camera", showInBottom: true, isSpecial: true },
+    { id: 'upload', icon: <FaUpload size={24} />, text: "อัพโหลดภาพ", path: "/upload", showInBottom: true, hasDropdown: true },
+    { id: 'history', icon: <FaHistory size={24} />, text: "ประวัติ", path: "/history", showInBottom: true },
+    { id: 'selectCatalogType', icon: <FaFolderOpen size={24} />, text: "บัญชีวัตถุพยาน", path: "/selectCatalogType", showInBottom: false },
+    { id: 'dashboard', icon: <FaChartSimple size={24} />, text: "สถิติ", path: "/dashboard", showInBottom: false },
+    { id: 'map', icon: <FaMapLocationDot size={24} />, text: "แผนที่", path: "/map", showInBottom: true },
   ];
 
-  const bottomNavItems = [
-    { id: 'home', icon: <FaHome size={22} />, text: "หน้าหลัก", path: "/home" },
-    { id: 'camera', icon: <FaCamera size={24} />, text: "ถ่ายภาพ", path: "/camera", isSpecial: true },
-    { id: 'upload', icon: <FaUpload size={22} />, text: "อัพโหลด", path: "/upload", hasSlideUp: true },
-  ];
-
-  const uploadOptions = [
+  const uploadDropdownItems = [
     { id: 'upload-gun', icon: <GiPistolGun size={24} />, text: "อาวุธปืน", path: "/upload/photo", mode: "อาวุปืน" },
     { id: 'upload-drug', icon: <FaPills size={24} />, text: "ยาเสพติด", path: "/upload/album", mode: "ยาเสพติด" },
   ];
 
+  const bottomSheetItems = [
+    { id: 'upload-gun', icon: <GiPistolGun size={24} />, text: "อาวุธปืน", path: "/upload/photo", mode: "อาวุปืน", action: "uploadOption" },
+    { id: 'upload-drug', icon: <FaPills size={24} />, text: "ยาเสพติด", path: "/upload/album", mode: "ยาเสพติด", action: "uploadOption" },
+    ...menuItems.filter(item => !item.showInBottom),
+  ];
+
+  const bottomNavItems = menuItems.filter(item => item.showInBottom);
+  
   const handleNavClick = (e, path, id) => {
     e.stopPropagation();
     setActiveTab(id);
     navigate(path);
     
-    // Close dropdowns
+    // ถ้าเป็น sidebar ที่ย่อแล้ว (collapsed) ให้ปิด dropdown เมื่อเลือกเมนูอื่น
     if (!isSidebarOpen && id !== 'upload') {
       setUploadDropdownOpen(false);
     }
+    
     closeBottomSheet();
   };
 
@@ -139,10 +158,16 @@ const Navigation = () => {
         const reader = new FileReader();
         reader.onload = (event) => {
           // Navigate to ImagePreview route with image data and mode
+          // Include the current path as sourcePath
           navigate('/imagePreview', { 
             state: { 
               imageData: event.target.result, 
-              mode: item.mode 
+              mode: item.mode,
+              // Add these important source tracking properties
+              fromCamera: false,
+              uploadFromCameraPage: false,
+              // Use the current path as sourcePath
+              sourcePath: location.pathname
             } 
           });
         };
@@ -152,8 +177,11 @@ const Navigation = () => {
     
     input.click();
     
-    // Close all menus
-    setUploadDropdownOpen(false);
+    // ปิด dropdown เฉพาะตอน sidebar ย่อ
+    if (!isSidebarOpen) {
+      setUploadDropdownOpen(false);
+    }
+    
     closeBottomSheet();
   };
 
@@ -166,25 +194,30 @@ const Navigation = () => {
       // Open the dropdown after sidebar is expanded
       setTimeout(() => {
         setUploadDropdownOpen(true);
-      }, 300);
+      }, 300); // Match transition duration
     } else {
       // Normal toggle behavior
       setUploadDropdownOpen(!isUploadDropdownOpen);
     }
   };
-  
-  const toggleBottomSheet = (e) => {
-    e.stopPropagation();
-    setBottomSheetOpen(!isBottomSheetOpen);
+
+  const handleBottomSheetItemClick = (e, item) => {
+    if (item.action === 'uploadOption') {
+      handleUploadOptionClick(e, item);
+    } else {
+      handleNavClick(e, item.path, item.id);
+    }
   };
 
   const closeBottomSheet = () => {
+    // ตั้งค่า transition ให้ animate ก่อนที่จะปิด bottom sheet
     setSheetTransition('transform 0.3s ease-out');
     setSheetTranslateY('100%');
     
+    // หลังจากที่ animation เสร็จสิ้นแล้วจึงค่อยปิด bottom sheet
     setTimeout(() => {
       setBottomSheetOpen(false);
-    }, 300);
+    }, 300); // ต้องตรงกับเวลา transition
   };
 
   // Touch Handlers for Draggable Bottom Sheet
@@ -251,6 +284,16 @@ const Navigation = () => {
     currentY.current = 0;
   };
 
+  const toggleSidebar = () => {
+    const newState = !isSidebarOpen;
+    setSidebarOpen(newState);
+    
+    // Close dropdown when sidebar is collapsed
+    if (!newState) {
+      setUploadDropdownOpen(false);
+    }
+  };
+
   const Sidebar = () => (
     <div className="h-full">      
       <div className={`
@@ -264,12 +307,7 @@ const Navigation = () => {
       `}>
         <div className="p-4">
           <button 
-            onClick={() => {
-              setSidebarOpen(!isSidebarOpen);
-              if (isSidebarOpen) {
-                setUploadDropdownOpen(false);
-              }
-            }} 
+            onClick={toggleSidebar} 
             className="text-white hover:text-gray-300 transition-colors"
           >
             <FiMenu size={24} />
@@ -277,7 +315,7 @@ const Navigation = () => {
         </div>
         
         <nav className="flex-1 space-y-1">
-          {sidebarItems.map((item) => (
+          {menuItems.map((item) => (
             <div key={item.id} className="relative" ref={item.id === 'upload' ? dropdownRef : null}>
               {activeTab === item.id && (
                 <div className="absolute left-0 top-0 w-2 h-full bg-[#990000]" />
@@ -310,7 +348,7 @@ const Navigation = () => {
                   {/* Dropdown Menu - Only show when sidebar is expanded */}
                   {isUploadDropdownOpen && isSidebarOpen && (
                     <div className="bg-[#222222]">
-                      {uploadOptions.map((subItem) => (
+                      {uploadDropdownItems.map((subItem) => (
                         <button
                           key={subItem.id}
                           onClick={(e) => handleUploadOptionClick(e, subItem)}
@@ -319,7 +357,7 @@ const Navigation = () => {
                             px-16
                             py-3 w-full text-left
                             hover:bg-[#333333] transition-all
-                            text-gray-300 hover:text-white
+                            ${activeTab === subItem.id ? 'bg-[#333333] text-white' : 'text-gray-300'}
                           `}
                         >
                           <div className="min-w-[24px]">
@@ -359,129 +397,156 @@ const Navigation = () => {
 
   const BottomNav = () => {
     return (
-      <>
-        {/* Bottom Sheet for Upload Options */}
-        {isBottomSheetOpen && (
-          <div 
-            className="fixed inset-0 bg-black/50 z-40 touch-none"
-            onClick={closeBottomSheet}
-          />
-        )}
+      <div className="fixed bottom-0 left-0 right-0 z-40">
+        {/* Background with blur */}
+        <div className="absolute inset-0 bg-[#333333] border-t border-gray-700/50" />
         
-        <div 
+        {/* Main Navigation */}
+        <div className="relative h-16 px-4">
+          <div className="flex items-center justify-between h-full">
+            {/* Home */}
+            <button
+              onClick={(e) => handleNavClick(e, "/home", 'home')}
+              className={`
+                flex flex-col items-center justify-center w-16 h-full
+                transition-all duration-200
+                ${activeTab === 'home' ? 'text-white' : 'text-gray-400 hover:text-gray-200'}
+              `}
+            >
+              <FaHome size={22} />
+              <span className="text-[10px] mt-1 font-medium">หน้าหลัก</span>
+            </button>
+
+            {/* History */}
+            <button
+              onClick={(e) => handleNavClick(e, "/history", 'history')}
+              className={`
+                flex flex-col items-center justify-center w-16 h-full
+                transition-all duration-200
+                ${activeTab === 'history' ? 'text-white' : 'text-gray-400 hover:text-gray-200'}
+              `}
+            >
+              <FaHistory size={22} />
+              <span className="text-[10px] mt-1 font-medium">ประวัติ</span>
+            </button>
+
+            {/* Camera Button (center) */}
+            <button
+              onClick={(e) => handleNavClick(e, "/camera", 'camera')}
+              className="flex flex-col items-center justify-center w-16 -mt-6"
+            >
+              <div className="
+                bg-[#990000] rounded-full p-4
+                shadow-lg shadow-red-900/30
+                transition-transform duration-200
+                hover:scale-105
+                relative
+              ">
+                <FaCamera size={24} className="text-white" />
+              </div>
+            </button>
+
+            {/* Map */}
+            <button
+              onClick={(e) => handleNavClick(e, "/map", 'map')}
+              className={`
+                flex flex-col items-center justify-center w-16 h-full
+                transition-all duration-200
+                ${activeTab === 'map' ? 'text-white' : 'text-gray-400 hover:text-gray-200'}
+              `}
+            >
+              <FaMapLocationDot size={22} />
+              <span className="text-[10px] mt-1 font-medium">แผนที่</span>
+            </button>
+
+            {/* Upload Menu */}
+            <button
+              onClick={() => setBottomSheetOpen(true)}
+              className={`
+                flex flex-col items-center justify-center w-16 h-full
+                transition-all duration-200
+                ${isBottomSheetOpen ? 'text-white' : 'text-gray-400 hover:text-gray-200'}
+              `}
+            >
+              <FiMenu size={22} />
+              <span className="text-[10px] mt-1 font-medium">เพิ่มเติม</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  };
+
+  const BottomSheet = () => {
+    if (!isBottomSheetOpen && sheetTranslateY === '100%') {
+      return null;
+    }
+
+    return (
+      <div
+        id="bottom-sheet-backdrop"
+        className={`fixed inset-0 z-50 flex items-end justify-center transition-opacity duration-300 ${
+            isBottomSheetOpen ? 'bg-black bg-opacity-50' : 'bg-transparent pointer-events-none'
+        }`}
+        onClick={isBottomSheetOpen ? closeBottomSheet : undefined}
+      >
+        <div
           ref={bottomSheetRef}
-          className="fixed left-0 right-0 z-50 bg-[#222222] rounded-t-xl shadow-lg"
+          className="bg-[#1A1A1A] rounded-t-xl w-full max-h-[70vh] flex flex-col will-change-transform"
           style={{
-            bottom: 0,
             transform: `translateY(${sheetTranslateY})`,
             transition: sheetTransition,
-            maxHeight: '70vh',
+            touchAction: 'none',
+            visibility: !isBottomSheetOpen && sheetTranslateY !== '100%' ? 'hidden' : 'visible',
           }}
+          onClick={(e) => e.stopPropagation()}
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
         >
-          {isBottomSheetOpen && (
-            <>
-              {/* Handle bar */}
-              <div className="w-full flex justify-center pt-3 pb-1">
-                <div className="w-12 h-1.5 rounded-full bg-gray-400" />
-              </div>
-              
-              {/* Header */}
-              <div className="px-6 py-3 border-b border-gray-700/50">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-medium text-white">อัพโหลดรูปภาพ</h3>
-                  <button 
-                    onClick={closeBottomSheet}
-                    className="text-gray-400 hover:text-white transition-colors" 
-                  >
-                    <FiX size={22} />
-                  </button>
-                </div>
-              </div>
-              
-              {/* Upload options */}
-              <div className="p-4">
-                {uploadOptions.map((item) => (
-                  <button
-                    key={item.id}
-                    onClick={(e) => handleUploadOptionClick(e, item)}
-                    className="flex items-center w-full px-4 py-5 mb-2 space-x-4 text-left text-white bg-[#333333] rounded-lg hover:bg-[#444444] transition-colors"
-                  >
-                    <div className="p-2 bg-[#444444] rounded-full">
-                      {item.icon}
-                    </div>
-                    <span className="text-base font-medium">{item.text}</span>
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
+          <div className="flex-shrink-0 w-full flex justify-center pt-3 pb-3 cursor-grab">
+            <div className="w-10 h-1.5 bg-gray-500 rounded-full"></div>
+          </div>
 
-        {/* Bottom Navigation Bar */}
-        <div className="fixed bottom-0 left-0 right-0 z-40">
-          {/* Background */}
-          <div className="absolute inset-0 bg-[#333333] border-t border-gray-700/50" />
-          
-          {/* Main Navigation */}
-          <div className="relative h-16 px-4">
-            <div className="flex items-center justify-around h-full">
-              {/* Home */}
-              <button
-                onClick={(e) => handleNavClick(e, "/home", 'home')}
-                className={`
-                  flex flex-col items-center justify-center w-16 h-full
-                  transition-all duration-200
-                  ${activeTab === 'home' ? 'text-white' : 'text-gray-400 hover:text-gray-200'}
-                `}
-              >
-                <FaHome size={22} />
-                <span className="text-[10px] mt-1 font-medium">หน้าหลัก</span>
-              </button>
+          <div className="flex-shrink-0 px-4 pb-4 flex items-center justify-between border-b border-gray-700/50">
+            <h2 className="text-white text-lg font-medium">เมนูเพิ่มเติม</h2>
+            <button
+              onClick={closeBottomSheet}
+              className="text-gray-400 hover:text-white p-1 rounded-full hover:bg-gray-700"
+            >
+              <FiX size={20} />
+            </button>
+          </div>
 
-              {/* Camera Button (center) */}
-              <button
-                onClick={(e) => handleNavClick(e, "/camera", 'camera')}
-                className="flex flex-col items-center justify-center w-16 -mt-6"
-              >
-                <div className="
-                  bg-[#990000] rounded-full p-4
-                  shadow-lg shadow-red-900/30
-                  transition-transform duration-200
-                  hover:scale-105
-                  relative
-                ">
-                  <FaCamera size={24} className="text-white" />
-                </div>
-                <span className="text-[10px] mt-1 font-medium text-white"></span>
-              </button>
-
-              {/* Upload (with slide up sheet) */}
-              <button
-                id="mobile-upload-button"
-                onClick={toggleBottomSheet}
-                className={`
-                  flex flex-col items-center justify-center w-16 h-full
-                  transition-all duration-200
-                  ${activeTab === 'upload' || isBottomSheetOpen ? 'text-white' : 'text-gray-400 hover:text-gray-200'}
-                `}
-              >
-                <FaUpload size={22} />
-                <span className="text-[10px] mt-1 font-medium">อัพโหลด</span>
-              </button>
+          <div className="overflow-y-auto flex-grow" style={{ touchAction: 'pan-y' }}>
+            <div className="grid grid-cols-4 gap-y-4 gap-x-2 px-4 py-4 pb-8">
+              {bottomSheetItems.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={(e) => handleBottomSheetItemClick(e, item)}
+                  className="flex flex-col items-center justify-start p-2 rounded-lg hover:bg-[#333333] transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-[#555555]"
+                  style={{ minHeight: '90px' }}
+                >
+                  <div className="text-white mb-2 h-12 w-12 flex items-center justify-center bg-[#444444] rounded-lg">
+                    {item.icon}
+                  </div>
+                  <span className="text-white text-xs text-center leading-tight">
+                    {item.text}
+                  </span>
+                </button>
+              ))}
             </div>
           </div>
         </div>
-      </>
-    )
+      </div>
+    );
   };
-  
+
   return (
     <>
       {isMobile ? <BottomNav /> : <Sidebar />}
-      <div className={`${isMobile ? 'pb-16' : ''} ${isSidebarOpen && !isMobile ? '' : !isMobile ? '' : ''} transition-all duration-300`}>
+      {isMobile && <BottomSheet />}
+      <div className={`${isMobile ? 'pb-16' : ''} ${isSidebarOpen && !isMobile ? '' : ''} transition-all duration-300`}>
         {/* Your main content would go here */}
       </div>
     </>
