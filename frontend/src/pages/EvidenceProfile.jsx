@@ -1,15 +1,32 @@
-
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import TabBar from '../components/EvidenceProfile/TabBar';
 import BottomBar from '../components/EvidenceProfile/BottomBar';
 import GunBasicInformation from '../components/EvidenceProfile/GunProfile';
 import DrugBasicInformation from '../components/EvidenceProfile/DrugProfile';
+import Gallery from '../components/EvidenceProfile/Gallery';
+import History from '../components/EvidenceProfile/History';
 
 const EvidenceProfile = () => {
   const location = useLocation();
   const navigate = useNavigate();
   
+  const [activeTab, setActiveTab] = useState(() => {
+    if (location.pathname.includes('/gallery')) return 1;
+    else if (location.pathname.includes('/history')) return 2;
+    return 0;
+  });
+
+  useEffect(() => {
+    if (location.pathname.includes('/gallery')) {
+      setActiveTab(1);
+    } else if (location.pathname.includes('history')) {
+      setActiveTab(2);
+    } else {
+      setActiveTab(0);
+    }
+  }, [location.pathname]);
+
   const [evidence, setEvidence] = useState(() => {
     if (location.state && (location.state.type || location.state.evidence)) {
       if (location.state.type) {
@@ -79,13 +96,30 @@ const EvidenceProfile = () => {
     }
   };
 
+  const renderContent = () => {
+    switch (activeTab) {
+      case 0:
+        return renderBasicInfo();
+      case 1:
+        return <Gallery evidence={evidence} firearmInfo={firearmInfo} />;
+      case 2:
+        return <History firearmInfo={firearmInfo} />;
+      default:
+        return null;
+    }
+  };
+
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       <TabBar />
       <div className="flex-1 overflow-auto">
-        {renderBasicInfo()}
+        {renderContent()}
       </div>
-      <BottomBar firearmInfo={firearmInfo} />
+      <BottomBar 
+  firearmInfo={firearmInfo} 
+  fromCamera={location.state?.fromCamera} 
+  sourcePath={location.state?.sourcePath} 
+/>
     </div>
   );
 };

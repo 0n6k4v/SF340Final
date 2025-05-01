@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
@@ -8,15 +7,19 @@ const TabBar = () => {
   const tabRefs = useRef([]);
   const [indicatorStyle, setIndicatorStyle] = useState({ left: 0, width: 0 });
   
-  // แก้ไขให้เหลือเพียงแท็บเดียว - ข้อมูลเบื้องต้น
   const tabs = [
     { id: 0, name: 'ข้อมูลเบื้องต้น', path: '/evidenceProfile' },
-    // ตัดแท็บ "คลังภาพ" และ "ประวัติ" ออกไป
+    { id: 1, name: 'คลังภาพ', path: '/evidenceProfile/gallery' },
+    { id: 2, name: 'ประวัติ', path: '/evidenceProfile/history' },
   ];
   
-  // เนื่องจากเหลือแท็บเดียว จึงรีเทิร์นค่า 0 เสมอ
   const findActiveTabIndex = () => {
-    return 0; // เหลือเพียงแท็บเดียว จึงรีเทิร์น 0 เสมอ
+    const currentPath = location.pathname;
+    // ใช้การตรวจสอบที่เฉพาะเจาะจงมากขึ้น
+    if (currentPath === '/evidenceProfile') return 0;
+    else if (currentPath === '/evidenceProfile/gallery') return 1;
+    else if (currentPath === '/evidenceProfile/history') return 2;
+    return 0;
   };
   
   const activeTab = findActiveTabIndex();

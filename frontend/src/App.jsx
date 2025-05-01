@@ -7,6 +7,7 @@ import Home from "./pages/Home";
 import CameraPage from './components/Camera/Camera';
 import ImagePreview from './components/Camera/ImagePreview';
 import EvidenceProfile from './pages/EvidenceProfile';
+import SaveToHistory from './pages/SaveToHistory';
 
 const App = () => {
   return (
@@ -25,6 +26,9 @@ const App = () => {
       <Route element={<Layout3 />}>
         {/* Evidence Profile */}
         <Route path='/evidenceProfile' element={<EvidenceProfile />} />
+        <Route path='/evidenceProfile/gallery' element={<EvidenceProfile />} />
+        <Route path='/evidenceProfile/save-to-record' element={<SaveToHistory />} />
+        <Route path='/evidenceProfile/history' element={<EvidenceProfile />} />
       </Route>
     </Routes>
   );
