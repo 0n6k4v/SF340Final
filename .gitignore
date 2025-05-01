@@ -1,0 +1,18 @@
+# Ignore AI model files
+*.pt
+*.pth
+*.h5
+*.pb
+*.onnx
+*.tflite
+*.mlmodel
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Specific model directories
+model/
+models/
+weights/
+checkpoints/
+trained_models/
